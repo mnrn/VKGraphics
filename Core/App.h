@@ -9,15 +9,12 @@
 // Including files
 // ********************************************************************************
 
-#include <GLFW/glfw3.h>
-
 #include <boost/assert.hpp>
 #include <boost/noncopyable.hpp>
 #include <iostream>
 
 #include "Common.h"
-
-#include "HID/KeyInput.h"
+#include "VK/VkApp.h"
 #include "Window.h"
 
 // ********************************************************************************
@@ -34,9 +31,13 @@ public:
 
     window_ = Window::Create(w, h, appName, samples);
     glfwGetFramebufferSize(window_, &width_, &height_);
+
+    vkImpl_.OnCreate(appName);
   }
 
   ~App() {
+    vkImpl_.OnDestroy();
+
     Window::Destroy(window_);
     glfwTerminate();
   }
@@ -54,7 +55,6 @@ public:
     while (!glfwWindowShouldClose(window_) &&
            !glfwGetKey(window_, GLFW_KEY_ESCAPE)) {
 
-      OnPreUpdate(window_);
       OnUpdate(static_cast<float>(glfwGetTime()));
       OnRender();
 
@@ -66,21 +66,12 @@ public:
     return EXIT_SUCCESS;
   }
 
-private:
+protected:
   GLFWwindow *window_ = nullptr;
   int width_;
   int height_;
 
-  static void OnPreUpdate(GLFWwindow *hwd) {
-    if (hwd == nullptr) {
-      return;
-    }
-
-    // キー入力更新を行いますが、キー入力初期化は各々に任せます。
-    if (KeyInput::IsExist()) {
-      KeyInput::Get().OnUpdate(hwd);
-    }
-  }
+  VkApp vkImpl_;
 };
 
 #endif // APP_HPP

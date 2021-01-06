@@ -82,6 +82,7 @@ function(build TARGET_NAME)
     # Main
     file(GLOB SOURCE 
         *.cc
+        Core/VK/*.cc 
         ${PROJECTS_DIR_NAME}/${TARGET_NAME}/*.cc
     )
     set(MAIN_CC ${TARGET_NAME}/${TARGET_NAME}/Main.cc)
@@ -110,8 +111,9 @@ endfunction(buildAll)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
 set(TARGETS
-    MinimalVK
-    ListsLayers
-    LoadValidationLayers
+    #MinimalVK
+    #ListsLayers
+    #LoadValidationLayers
+    HelloTriangle
 )
 buildAll()
