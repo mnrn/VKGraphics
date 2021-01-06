@@ -30,6 +30,7 @@ void VkApp::OnCreate(const char *appName, GLFWwindow *window) {
 #endif
   CreateSurface(window);
   SelectPhysicalDevice();
+  CreateLogicalDevice();
 }
 
 void VkApp::OnDestroy() {
@@ -197,4 +198,48 @@ float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
 #endif
 
   return score;
+}
+
+void VkApp::CreateLogicalDevice() {
+  QueueFamilies families = QueueFamilies::Find(instance_);
+
+  std::vector<VkDeviceQueueCreateInfo> createQueues;
+  float prio = 1.0f;
+  for (int family : families.UniqueFamilies()) {
+    VkDeviceQueueCreateInfo create{};
+    create.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    create.queueFamilyIndex = static_cast<uint32_t>(family);
+    create.queueCount = 1;
+    create.pQueuePriorities = &prio;
+    createQueues.emplace_back(create);
+  }
+
+  VkPhysicalDeviceFeatures features{};
+  features.samplerAnisotropy = VK_TRUE;
+
+  VkDeviceCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  create.queueCreateInfoCount = static_cast<uint32_t>(createQueues.size());
+  create.pQueueCreateInfos = createQueues.data();
+  create.enabledExtensionCount =
+      static_cast<uint32_t>(deviceExtensions_.size());
+  create.ppEnabledExtensionNames = deviceExtensions_.data();
+  create.pEnabledFeatures = &features;
+  if (isEnableValidationLayers_) {
+    create.enabledLayerCount = static_cast<uint32_t>(validationLayers_.size());
+    create.ppEnabledLayerNames = validationLayers_.data();
+  } else {
+    create.enabledLayerCount = 0;
+  }
+
+  if (vkCreateDevice(instance_.physicalDevice, &create, nullptr,
+                     &instance_.device) != VK_SUCCESS) {
+    BOOST_ASSERT_MSG(false, "Failed to create logical device");
+  }
+
+  vkGetDeviceQueue(instance_.device, static_cast<uint32_t>(families.graphics),
+                   0, &instance_.queues.graphics);
+  vkGetDeviceQueue(instance_.device,
+                   static_cast<uint32_t>(families.presentation), 0,
+                   &instance_.queues.presentation);
 }
