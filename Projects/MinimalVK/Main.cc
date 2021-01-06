@@ -1,6 +1,5 @@
-#include <vulkan/vulkan.h>
-
 #include <iostream>
+#include <vulkan/vulkan.h>
 
 int main() {
   VkInstance inst;

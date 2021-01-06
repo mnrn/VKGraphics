@@ -24,7 +24,7 @@ set(CMAKE_CXX_FLAGS_RELEASE, "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG -O4 -flto")
 set(CMAKE_CXX_FLAGS_MINSIZEREL, "${CMAKE_CXX_FLAGS_MINSIZEREL} -DNDEBUG -Oz")
 
 # vulkan
-find_package(Vulkan)
+find_package(Vulkan REQUIRED)
 message(STATUS "@@Vulkan_FOUND: ${Vulkan_FOUND}")
 message(STATUS "@@Vulkan_INCLUDE_DIR: ${Vulkan_INCLUDE_DIR}")
 message(STATUS "@@Vulkan_LIBRARY: ${Vulkan_LIBRARY}")
@@ -111,5 +111,7 @@ endfunction(buildAll)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
 set(TARGETS
     MinimalVK
+    ListsLayers
+    LoadValidationLayers
 )
 buildAll()
