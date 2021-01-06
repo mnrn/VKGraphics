@@ -21,11 +21,12 @@
 // Init & Deinit
 //*--------------------------------------------------------------------------------
 
-void VkApp::OnCreate(const char *appName) {
+void VkApp::OnCreate(const char *appName, GLFWwindow *window) {
   CreateInstance(appName);
   if (isEnableValidationLayers_) {
     debug_.Setup(instance_.Get());
   }
+  CreateSurface(window);
 }
 
 void VkApp::OnDestroy() {
@@ -72,5 +73,12 @@ void VkApp::CreateInstance(const char *appName) {
 
   if (vkCreateInstance(&create, nullptr, instance_.Set()) != VK_SUCCESS) {
     BOOST_ASSERT_MSG(false, "Failed to create instance!");
+  }
+}
+
+void VkApp::CreateSurface(GLFWwindow *window) {
+  if (glfwCreateWindowSurface(instance_.Get(), window, nullptr,
+                              &instance_.surface)) {
+    BOOST_ASSERT_MSG(false, "Failed to create window surface!");
   }
 }

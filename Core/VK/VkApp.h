@@ -15,11 +15,12 @@
 
 class VkApp : boost::noncopyable {
 public:
-  void OnCreate(const char *appName);
+  void OnCreate(const char *appName, GLFWwindow *window);
   void OnDestroy();
 
 private:
   void CreateInstance(const char *appName);
+  void CreateSurface(GLFWwindow *window);
 
   Instance instance_{};
   DebugMessenger debug_{};

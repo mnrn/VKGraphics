@@ -32,7 +32,7 @@ public:
     window_ = Window::Create(w, h, appName, samples);
     glfwGetFramebufferSize(window_, &width_, &height_);
 
-    vkImpl_.OnCreate(appName);
+    vkImpl_.OnCreate(appName, window_);
   }
 
   ~App() {
