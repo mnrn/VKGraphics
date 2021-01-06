@@ -21,6 +21,10 @@ public:
 private:
   void CreateInstance(const char *appName);
   void CreateSurface(GLFWwindow *window);
+  void SelectPhysicalDevice();
+  void CreateLogicalDevice();
+
+  float CalcDeviceScore(VkPhysicalDevice device) const;
 
   Instance instance_{};
   DebugMessenger debug_{};
@@ -32,7 +36,10 @@ private:
 #else
 #endif
   };
-#ifdef NDEBUG
+  std::vector<const char *> deviceExtensions_ = {
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+  };
+#if defined(NDEBUG)
   const bool isEnableValidationLayers_ = false;
 #else
   const bool isEnableValidationLayers_ = true;
