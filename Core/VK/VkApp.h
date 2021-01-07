@@ -12,10 +12,11 @@
 
 #include "VK/Debug.h"
 #include "VK/Instance.h"
+#include "VK/Swapchain.h"
 
 class VkApp : boost::noncopyable {
 public:
-  void OnCreate(const char *appName, GLFWwindow *window);
+  void OnCreate(const char *appName, int width, int height, GLFWwindow *window);
   void OnDestroy();
 
 private:
@@ -23,10 +24,12 @@ private:
   void CreateSurface(GLFWwindow *window);
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
+  void CleanupSwapchain();
 
   float CalcDeviceScore(VkPhysicalDevice device) const;
 
   Instance instance_{};
+  Swapchain swapchain_{};
   DebugMessenger debug_{};
 
   std::vector<const char *> validationLayers_ = {

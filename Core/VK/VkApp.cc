@@ -23,7 +23,8 @@
 // Init & Deinit
 //*--------------------------------------------------------------------------------
 
-void VkApp::OnCreate(const char *appName, GLFWwindow *window) {
+void VkApp::OnCreate(const char *appName, int width, int height,
+                     GLFWwindow *window) {
   CreateInstance(appName);
 #if !defined(NDEBUG)
   debug_.Setup(instance_.Get());
@@ -31,9 +32,11 @@ void VkApp::OnCreate(const char *appName, GLFWwindow *window) {
   CreateSurface(window);
   SelectPhysicalDevice();
   CreateLogicalDevice();
+  swapchain_.Create(instance_, width, height, false);
 }
 
 void VkApp::OnDestroy() {
+  CleanupSwapchain();
 #if !defined(NDEBUG)
   debug_.Cleanup(instance_.Get());
 #endif
@@ -243,3 +246,5 @@ void VkApp::CreateLogicalDevice() {
                    static_cast<uint32_t>(families.presentation), 0,
                    &instance_.queues.presentation);
 }
+
+void VkApp::CleanupSwapchain() { swapchain_.Cleanup(instance_); }

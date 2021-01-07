@@ -28,11 +28,12 @@ public:
       BOOST_ASSERT_MSG(false, "glfw Initialization failed!");
       return;
     }
-
+    width_ = w;
+    height_ = h;
     window_ = Window::Create(w, h, appName, samples);
     glfwGetFramebufferSize(window_, &width_, &height_);
 
-    vkImpl_.OnCreate(appName, window_);
+    vkImpl_.OnCreate(appName, width_, height_, window_);
   }
 
   ~App() {
