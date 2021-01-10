@@ -80,9 +80,10 @@ endif()
 # Function for building
 function(build TARGET_NAME)
     # Main
-    file(GLOB SOURCE 
+    file(GLOB SOURCE
         *.cc
-        Core/VK/*.cc 
+        Core/VK/*.cc
+        #Core/Vk/Pipeline/*.cc
         ${PROJECTS_DIR_NAME}/${TARGET_NAME}/*.cc
     )
     set(MAIN_CC ${TARGET_NAME}/${TARGET_NAME}/Main.cc)

@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <boost/assert.hpp>
-#include <numeric>
 
 #include "VK/ImageView.h"
 #include "VK/Instance.h"
@@ -115,8 +114,7 @@ void Swapchain::Create(const Instance &instance, int width, int height,
   create.clipped = VK_TRUE;
   create.oldSwapchain = VK_NULL_HANDLE;
 
-  if (vkCreateSwapchainKHR(instance.device, &create, nullptr, &handle) !=
-      VK_SUCCESS) {
+  if (vkCreateSwapchainKHR(instance.device, &create, nullptr, &handle)) {
     BOOST_ASSERT_MSG(false, "Failed to create swap chain!");
   }
 

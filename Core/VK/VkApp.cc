@@ -13,8 +13,6 @@
 #include <map>
 #include <spdlog/spdlog.h>
 
-#include "VK/Debug.h"
-
 //*--------------------------------------------------------------------------------
 // Constant expressions
 //*--------------------------------------------------------------------------------
@@ -77,14 +75,14 @@ void VkApp::CreateInstance(const char *appName) {
   create.ppEnabledExtensionNames = extensions.data();
 
   if (isEnableValidationLayers_) {
-    spdlog::info("Enabling valiadation");
+    spdlog::info("Enabling validation");
     create.enabledLayerCount = static_cast<uint32_t>(validationLayers_.size());
     create.ppEnabledLayerNames = validationLayers_.data();
   } else {
     create.enabledLayerCount = 0;
   }
 
-  if (vkCreateInstance(&create, nullptr, instance_.Set()) != VK_SUCCESS) {
+  if (vkCreateInstance(&create, nullptr, instance_.Set())) {
     BOOST_ASSERT_MSG(false, "Failed to create instance!");
   }
 }
@@ -151,7 +149,7 @@ void VkApp::CreateLogicalDevice() {
   }
 
   if (vkCreateDevice(instance_.physicalDevice, &create, nullptr,
-                     &instance_.device) != VK_SUCCESS) {
+                     &instance_.device)) {
     BOOST_ASSERT_MSG(false, "Failed to create logical device");
   }
 

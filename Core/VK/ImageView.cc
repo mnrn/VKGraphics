@@ -33,8 +33,7 @@ VkImageView Create(const Instance &instance, VkImage image,
       (type == VK_IMAGE_VIEW_TYPE_CUBE) ? 6 : 1;
 
   VkImageView imageView;
-  if (vkCreateImageView(instance.device, &create, nullptr, &imageView) !=
-      VK_SUCCESS) {
+  if (vkCreateImageView(instance.device, &create, nullptr, &imageView)) {
     BOOST_ASSERT_MSG(false, "Failed to create texture image view!");
   }
   return imageView;
