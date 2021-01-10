@@ -8,8 +8,8 @@
 #include <boost/assert.hpp>
 #include <numeric>
 
-#include "Vk/ImageView.h"
-#include "Vk/Instance.h"
+#include "VK/ImageView.h"
+#include "VK/Instance.h"
 
 static VkSurfaceFormatKHR
 SelectSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &available) {
