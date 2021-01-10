@@ -5,10 +5,7 @@
 #include "View/Frustum.h"
 
 #include <boost/assert.hpp>
-#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <iostream>
-#include <vector>
 
 void Frustum::SetupPerspective(float fovy, float aspectRatio, float near,
                                float far) {
