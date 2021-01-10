@@ -7,9 +7,9 @@
 #include <boost/assert.hpp>
 #include <vector>
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Instance
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 const VkInstance &Instance::Get() const { return instance; }
 
@@ -19,15 +19,15 @@ VkInstance *Instance::Set() {
   return &instance;
 }
 
-void Instance::Cleanup() {
+void Instance::Cleanup() const {
   vkDestroyDevice(device, nullptr);
   vkDestroySurfaceKHR(instance, surface, nullptr);
   vkDestroyInstance(instance, nullptr);
 }
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Queue Families
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 bool QueueFamilies::IsComplete() const {
   return graphics >= 0 && presentation >= 0;

@@ -18,6 +18,6 @@ struct Swapchain {
   VkExtent2D extent;
 
   void Create(const Instance &instance, int width, int height, bool forceFifo);
-  const VkSwapchainKHR &Get() const;
+  [[nodiscard]]const VkSwapchainKHR &Get() const;
   void Cleanup(const Instance &);
 };

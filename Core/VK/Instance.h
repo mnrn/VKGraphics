@@ -14,9 +14,9 @@ struct Instance {
   Instance &operator=(const Instance &) = delete;
   Instance &operator=(Instance &&) = delete;
 
-  const VkInstance &Get() const;
+  [[nodiscard]]const VkInstance &Get() const;
   VkInstance *Set();
-  void Cleanup();
+  void Cleanup() const;
 
   VkInstance instance = VK_NULL_HANDLE;
   VkDevice device = VK_NULL_HANDLE;
@@ -29,17 +29,17 @@ struct Instance {
   } queues;
 
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-  VkPhysicalDeviceProperties properties;
+  VkPhysicalDeviceProperties properties{};
 };
 
 struct QueueFamilies {
   int graphics = -1;
   int presentation = -1;
 
-  bool IsComplete() const;
-  std::set<int> UniqueFamilies() const;
+  [[nodiscard]]bool IsComplete() const;
+  [[nodiscard]]std::set<int> UniqueFamilies() const;
 
-  static QueueFamilies Find(VkPhysicalDevice physicakDevice,
+  static QueueFamilies Find(VkPhysicalDevice physicalDevice,
                             VkSurfaceKHR surface);
   static QueueFamilies Find(const Instance &instance);
 };

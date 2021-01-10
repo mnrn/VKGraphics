@@ -23,10 +23,9 @@
 
 class App : private boost::noncopyable {
 public:
-  App(const char *appName, int w = 1280, int h = 720, int samples = 0) {
+  explicit App(const char *appName, int w = 1280, int h = 720, int samples = 0) {
     if (glfwInit() == GL_FALSE) {
       BOOST_ASSERT_MSG(false, "glfw Initialization failed!");
-      return;
     }
     width_ = w;
     height_ = h;

@@ -16,9 +16,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL Callback(
 }
 } // namespace Debug
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Create & Destroy
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 VkResult
 DebugMessenger::Create(VkInstance instance,
@@ -44,9 +44,9 @@ void DebugMessenger::Destroy(VkInstance instance,
   }
 }
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Setup & Cleanup
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 void DebugMessenger::Setup(VkInstance instance) {
   VkDebugUtilsMessengerCreateInfoEXT info = ExtractCreateInfo();
@@ -55,7 +55,7 @@ void DebugMessenger::Setup(VkInstance instance) {
   }
 }
 
-void DebugMessenger::Cleanup(VkInstance instance) {
+void DebugMessenger::Cleanup(VkInstance instance) const {
   Destroy(instance, msg, nullptr);
 }
 

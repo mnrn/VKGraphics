@@ -2,9 +2,9 @@
  * @brief Vulkan Application
  */
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Including files
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 #include "VkApp.h"
 #include <vulkan/vulkan.h>
@@ -13,13 +13,13 @@
 #include <map>
 #include <spdlog/spdlog.h>
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Constant expressions
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Init & Deinit
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 void VkApp::OnCreate(const char *appName, int width, int height,
                      GLFWwindow *window) {
@@ -42,9 +42,9 @@ void VkApp::OnDestroy() {
   instance_.Cleanup();
 }
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 // Create & Destroy
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 void VkApp::CreateInstance(const char *appName) {
   VkApplicationInfo info{};
@@ -228,9 +228,9 @@ void VkApp::CleanupSwapchain() {
   swapchain_.Cleanup(instance_);
 }
 
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 //
-//*--------------------------------------------------------------------------------
+//*-----------------------------------------------------------------------------
 
 float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
   VkPhysicalDeviceProperties prop{};
@@ -334,11 +334,10 @@ VkApp::FindSupportedFormat(const std::vector<VkFormat> &candicates,
   for (const auto &format : candicates) {
     VkFormatProperties props{};
     vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
-    if (tiling == VK_IMAGE_TILING_LINEAR &&
-        (props.linearTilingFeatures & features) == features) {
-      return format;
-    } else if (tiling == VK_IMAGE_TILING_OPTIMAL &&
-               (props.optimalTilingFeatures & features) == features) {
+    if ((tiling == VK_IMAGE_TILING_LINEAR &&
+         (props.linearTilingFeatures & features) == features) ||
+        (tiling == VK_IMAGE_TILING_OPTIMAL &&
+         (props.optimalTilingFeatures & features) == features)) {
       return format;
     }
   }
