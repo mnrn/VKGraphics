@@ -33,6 +33,7 @@ void VkApp::OnCreate(const char *appName, int width, int height,
   SelectPhysicalDevice();
   CreateLogicalDevice();
   swapchain_.Create(instance_, width, height, false);
+  CreateRenderPass();
 }
 
 void VkApp::OnDestroy() {
@@ -116,6 +117,122 @@ void VkApp::SelectPhysicalDevice() {
   vkGetPhysicalDeviceProperties(instance_.physicalDevice,
                                 &instance_.properties);
 }
+
+void VkApp::CreateLogicalDevice() {
+  QueueFamilies families = QueueFamilies::Find(instance_);
+
+  std::vector<VkDeviceQueueCreateInfo> createQueues;
+  float prio = 1.0f;
+  for (int family : families.UniqueFamilies()) {
+    VkDeviceQueueCreateInfo create{};
+    create.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    create.queueFamilyIndex = static_cast<uint32_t>(family);
+    create.queueCount = 1;
+    create.pQueuePriorities = &prio;
+    createQueues.emplace_back(create);
+  }
+
+  VkPhysicalDeviceFeatures features{};
+  features.samplerAnisotropy = VK_TRUE;
+
+  VkDeviceCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  create.queueCreateInfoCount = static_cast<uint32_t>(createQueues.size());
+  create.pQueueCreateInfos = createQueues.data();
+  create.enabledExtensionCount =
+      static_cast<uint32_t>(deviceExtensions_.size());
+  create.ppEnabledExtensionNames = deviceExtensions_.data();
+  create.pEnabledFeatures = &features;
+  if (isEnableValidationLayers_) {
+    create.enabledLayerCount = static_cast<uint32_t>(validationLayers_.size());
+    create.ppEnabledLayerNames = validationLayers_.data();
+  } else {
+    create.enabledLayerCount = 0;
+  }
+
+  if (vkCreateDevice(instance_.physicalDevice, &create, nullptr,
+                     &instance_.device) != VK_SUCCESS) {
+    BOOST_ASSERT_MSG(false, "Failed to create logical device");
+  }
+
+  vkGetDeviceQueue(instance_.device, static_cast<uint32_t>(families.graphics),
+                   0, &instance_.queues.graphics);
+  vkGetDeviceQueue(instance_.device,
+                   static_cast<uint32_t>(families.presentation), 0,
+                   &instance_.queues.presentation);
+}
+
+void VkApp::CreateRenderPass() {
+  VkAttachmentDescription color{};
+  color.format = swapchain_.format;
+  color.samples = VK_SAMPLE_COUNT_1_BIT;
+  color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+  VkAttachmentReference colorRef{};
+  colorRef.attachment = 0;
+  colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentDescription depth{};
+  if (const auto format = FindSuitableDepthFormat(instance_.physicalDevice)) {
+    depth.format = format.value();
+  } else {
+    BOOST_ASSERT_MSG(false, "Failed to find supported depth format!");
+  }
+  depth.samples = VK_SAMPLE_COUNT_1_BIT;
+  depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  depth.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  depth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference depthRef{};
+  depthRef.attachment = 1;
+  depthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkSubpassDescription subpass{};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &colorRef;
+  subpass.pDepthStencilAttachment = &depthRef;
+
+  VkSubpassDependency dependency{};
+  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependency.dstSubpass = 0;
+  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.srcAccessMask = 0;
+  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+  std::vector<VkAttachmentDescription> attachments{color, depth};
+  VkRenderPassCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  create.attachmentCount = static_cast<uint32_t>(attachments.size());
+  create.pAttachments = attachments.data();
+  create.subpassCount = 1;
+  create.pSubpasses = &subpass;
+  create.dependencyCount = 1;
+  create.pDependencies = &dependency;
+
+  if (vkCreateRenderPass(instance_.device, &create, nullptr, &renderPass_)) {
+    BOOST_ASSERT_MSG(false, "Failed to create render pass!");
+  }
+}
+
+void VkApp::CleanupSwapchain() {
+  vkDestroyRenderPass(instance_.device, renderPass_, nullptr);
+  swapchain_.Cleanup(instance_);
+}
+
+//*--------------------------------------------------------------------------------
+//
+//*--------------------------------------------------------------------------------
 
 float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
   VkPhysicalDeviceProperties prop{};
@@ -203,48 +320,29 @@ float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
   return score;
 }
 
-void VkApp::CreateLogicalDevice() {
-  QueueFamilies families = QueueFamilies::Find(instance_);
-
-  std::vector<VkDeviceQueueCreateInfo> createQueues;
-  float prio = 1.0f;
-  for (int family : families.UniqueFamilies()) {
-    VkDeviceQueueCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    create.queueFamilyIndex = static_cast<uint32_t>(family);
-    create.queueCount = 1;
-    create.pQueuePriorities = &prio;
-    createQueues.emplace_back(create);
-  }
-
-  VkPhysicalDeviceFeatures features{};
-  features.samplerAnisotropy = VK_TRUE;
-
-  VkDeviceCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  create.queueCreateInfoCount = static_cast<uint32_t>(createQueues.size());
-  create.pQueueCreateInfos = createQueues.data();
-  create.enabledExtensionCount =
-      static_cast<uint32_t>(deviceExtensions_.size());
-  create.ppEnabledExtensionNames = deviceExtensions_.data();
-  create.pEnabledFeatures = &features;
-  if (isEnableValidationLayers_) {
-    create.enabledLayerCount = static_cast<uint32_t>(validationLayers_.size());
-    create.ppEnabledLayerNames = validationLayers_.data();
-  } else {
-    create.enabledLayerCount = 0;
-  }
-
-  if (vkCreateDevice(instance_.physicalDevice, &create, nullptr,
-                     &instance_.device) != VK_SUCCESS) {
-    BOOST_ASSERT_MSG(false, "Failed to create logical device");
-  }
-
-  vkGetDeviceQueue(instance_.device, static_cast<uint32_t>(families.graphics),
-                   0, &instance_.queues.graphics);
-  vkGetDeviceQueue(instance_.device,
-                   static_cast<uint32_t>(families.presentation), 0,
-                   &instance_.queues.presentation);
+std::optional<VkFormat>
+VkApp::FindSuitableDepthFormat(VkPhysicalDevice physicalDevice) const {
+  return FindSupportedFormat(
+      {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+       VK_FORMAT_D24_UNORM_S8_UINT},
+      VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
+      physicalDevice);
 }
 
-void VkApp::CleanupSwapchain() { swapchain_.Cleanup(instance_); }
+std::optional<VkFormat>
+VkApp::FindSupportedFormat(const std::vector<VkFormat> &candicates,
+                           VkImageTiling tiling, VkFormatFeatureFlags features,
+                           VkPhysicalDevice physicalDevice) const {
+  for (const auto &format : candicates) {
+    VkFormatProperties props{};
+    vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+    if (tiling == VK_IMAGE_TILING_LINEAR &&
+        (props.linearTilingFeatures & features) == features) {
+      return format;
+    } else if (tiling == VK_IMAGE_TILING_OPTIMAL &&
+               (props.optimalTilingFeatures & features) == features) {
+      return format;
+    }
+  }
+  return std::nullopt;
+}

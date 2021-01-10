@@ -5,6 +5,7 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
+#include <optional>
 #include <vector>
 
 #define GLFW_INCLUDE_VULKAN
@@ -24,12 +25,22 @@ private:
   void CreateSurface(GLFWwindow *window);
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
+  void CreateRenderPass();
+  // void CreatePipeline();
+
   void CleanupSwapchain();
 
-  float CalcDeviceScore(VkPhysicalDevice device) const;
+  float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
+  std::optional<VkFormat>
+  FindSuitableDepthFormat(VkPhysicalDevice physicalDevice) const;
+  std::optional<VkFormat>
+  FindSupportedFormat(const std::vector<VkFormat> &candicates,
+                      VkImageTiling tiling, VkFormatFeatureFlags features,
+                      VkPhysicalDevice physicalDevice) const;
 
   Instance instance_{};
   Swapchain swapchain_{};
+  VkRenderPass renderPass_{VK_NULL_HANDLE};
   DebugMessenger debug_{};
 
   std::vector<const char *> validationLayers_ = {
