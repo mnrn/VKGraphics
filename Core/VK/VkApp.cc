@@ -13,6 +13,8 @@
 #include <map>
 #include <spdlog/spdlog.h>
 
+#include "VK/Buffer/DepthStencil.h"
+
 //*-----------------------------------------------------------------------------
 // Constant expressions
 //*-----------------------------------------------------------------------------
@@ -21,7 +23,7 @@
 // Init & Deinit
 //*-----------------------------------------------------------------------------
 
-void VkApp::OnCreate(const nlohmann::json& config, GLFWwindow *window) {
+void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   const auto appName = config["AppName"].get<std::string>();
   const auto width = config["Width"].get<int>();
   const auto height = config["Height"].get<int>();
@@ -36,11 +38,15 @@ void VkApp::OnCreate(const nlohmann::json& config, GLFWwindow *window) {
   swapchain_.Create(instance_, width, height, false);
   CreateRenderPass();
   pipelines_.Create(instance_, swapchain_, renderPass_, config["Pipelines"]);
+  CreateCommandPool();
+  CreateFramebuffers();
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Cleanup(instance_);
+
+  vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
   debug_.Cleanup(instance_.Get());
 #endif
@@ -181,7 +187,7 @@ void VkApp::CreateRenderPass() {
   colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkAttachmentDescription depth{};
-  if (const auto format = FindSuitableDepthFormat(instance_.physicalDevice)) {
+  if (const auto format = DepthStencil::FindDepthFormat(instance_.physicalDevice)) {
     depth.format = format.value();
   } else {
     BOOST_ASSERT_MSG(false, "Failed to find supported depth format!");
@@ -213,7 +219,8 @@ void VkApp::CreateRenderPass() {
   dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-  std::vector<VkAttachmentDescription> attachments{color, depth};
+  // TODO: DepthStencil対応
+  std::vector<VkAttachmentDescription> attachments{color, /* depth */};
   VkRenderPassCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
   create.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -228,14 +235,53 @@ void VkApp::CreateRenderPass() {
   }
 }
 
+void VkApp::CreateCommandPool() {
+  QueueFamilies families = QueueFamilies::Find(instance_);
+
+  VkCommandPoolCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  create.queueFamilyIndex = static_cast<uint32_t>(families.graphics);
+  create.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  if (vkCreateCommandPool(instance_.device, &create, nullptr,
+                          &instance_.pool)) {
+    BOOST_ASSERT_MSG(false, "Failed to create command pool!");
+  }
+}
+
+void VkApp::CreateFramebuffers() {
+  framebuffers_.resize(swapchain_.views.size());
+  for (size_t i = 0; i < framebuffers_.size(); i++) {
+    // TODO: DepthStencil対応
+    std::vector<VkImageView> attachments = {swapchain_.views[i],
+                                            /* depthView */};
+    VkFramebufferCreateInfo create{};
+    create.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    create.renderPass = renderPass_;
+    create.attachmentCount = static_cast<uint32_t>(attachments.size());
+    create.pAttachments = attachments.data();
+    create.width = swapchain_.extent.width;
+    create.height = swapchain_.extent.height;
+    create.layers = 1;
+    if (vkCreateFramebuffer(instance_.device, &create, nullptr,
+                            &framebuffers_[i])) {
+      BOOST_ASSERT_MSG(false, "Failed to create framebuffer!");
+    }
+  }
+}
+
 void VkApp::CleanupSwapchain() {
+
+  for (auto &framebuffer : framebuffers_) {
+    vkDestroyFramebuffer(instance_.device, framebuffer, nullptr);
+  }
+
   pipelines_.Clear(instance_);
   vkDestroyRenderPass(instance_.device, renderPass_, nullptr);
   swapchain_.Cleanup(instance_);
 }
 
 //*-----------------------------------------------------------------------------
-//
+// Subroutine
 //*-----------------------------------------------------------------------------
 
 float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
@@ -322,30 +368,4 @@ float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
 #endif
 
   return score;
-}
-
-std::optional<VkFormat>
-VkApp::FindSuitableDepthFormat(VkPhysicalDevice physicalDevice) const {
-  return FindSupportedFormat(
-      {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
-       VK_FORMAT_D24_UNORM_S8_UINT},
-      VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      physicalDevice);
-}
-
-std::optional<VkFormat>
-VkApp::FindSupportedFormat(const std::vector<VkFormat> &candicates,
-                           VkImageTiling tiling, VkFormatFeatureFlags features,
-                           VkPhysicalDevice physicalDevice) const {
-  for (const auto &format : candicates) {
-    VkFormatProperties props{};
-    vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
-    if ((tiling == VK_IMAGE_TILING_LINEAR &&
-         (props.linearTilingFeatures & features) == features) ||
-        (tiling == VK_IMAGE_TILING_OPTIMAL &&
-         (props.optimalTilingFeatures & features) == features)) {
-      return format;
-    }
-  }
-  return std::nullopt;
 }

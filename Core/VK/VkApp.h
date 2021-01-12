@@ -28,21 +28,18 @@ private:
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
   void CreateRenderPass();
+  void CreateCommandPool();
+  void CreateFramebuffers();
 
   void CleanupSwapchain();
 
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
-  std::optional<VkFormat>
-  FindSuitableDepthFormat(VkPhysicalDevice physicalDevice) const;
-  std::optional<VkFormat>
-  FindSupportedFormat(const std::vector<VkFormat> &candicates,
-                      VkImageTiling tiling, VkFormatFeatureFlags features,
-                      VkPhysicalDevice physicalDevice) const;
 
   Instance instance_{};
   Swapchain swapchain_{};
   Pipelines pipelines_{};
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
+  std::vector<VkFramebuffer> framebuffers_{};
   DebugMessenger debug_{};
 
   std::vector<const char *> validationLayers_ = {
