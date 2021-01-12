@@ -21,9 +21,12 @@
 // Init & Deinit
 //*-----------------------------------------------------------------------------
 
-void VkApp::OnCreate(const char *appName, int width, int height,
-                     GLFWwindow *window) {
-  CreateInstance(appName);
+void VkApp::OnCreate(const nlohmann::json& config, GLFWwindow *window) {
+  const auto appName = config["AppName"].get<std::string>();
+  const auto width = config["Width"].get<int>();
+  const auto height = config["Height"].get<int>();
+
+  CreateInstance(appName.c_str());
 #if !defined(NDEBUG)
   debug_.Setup(instance_.Get());
 #endif
@@ -32,10 +35,12 @@ void VkApp::OnCreate(const char *appName, int width, int height,
   CreateLogicalDevice();
   swapchain_.Create(instance_, width, height, false);
   CreateRenderPass();
+  pipelines_.Create(instance_, swapchain_, renderPass_, config["Pipelines"]);
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
+  pipelines_.Cleanup(instance_);
 #if !defined(NDEBUG)
   debug_.Cleanup(instance_.Get());
 #endif
@@ -224,6 +229,7 @@ void VkApp::CreateRenderPass() {
 }
 
 void VkApp::CleanupSwapchain() {
+  pipelines_.Clear(instance_);
   vkDestroyRenderPass(instance_.device, renderPass_, nullptr);
   swapchain_.Cleanup(instance_);
 }

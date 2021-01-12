@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <boost/assert.hpp>
 
-#include "VK/ImageView.h"
+#include "VK/Image/ImageView.h"
 #include "VK/Instance.h"
 
 static VkSurfaceFormatKHR

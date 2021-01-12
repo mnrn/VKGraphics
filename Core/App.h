@@ -12,6 +12,7 @@
 #include <boost/assert.hpp>
 #include <boost/noncopyable.hpp>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 #include "Common.h"
 #include "VK/VkApp.h"
@@ -23,16 +24,18 @@
 
 class App : private boost::noncopyable {
 public:
-  explicit App(const char *appName, int w = 1280, int h = 720, int samples = 0) {
+  explicit App(const nlohmann::json& config) {
     if (glfwInit() == GL_FALSE) {
       BOOST_ASSERT_MSG(false, "glfw Initialization failed!");
     }
-    width_ = w;
-    height_ = h;
-    window_ = Window::Create(w, h, appName, samples);
+    const auto appName = config["AppName"].get<std::string>();
+    width_ = config["Width"].get<int>();
+    height_ = config["Height"].get<int>();
+    const auto samples = config["Samples"].get<int>();
+    window_ = Window::Create(width_, height_, appName.c_str(), samples);
     glfwGetFramebufferSize(window_, &width_, &height_);
 
-    vkImpl_.OnCreate(appName, width_, height_, window_);
+    vkImpl_.OnCreate(config, window_);
   }
 
   ~App() {

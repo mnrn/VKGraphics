@@ -5,6 +5,7 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <vector>
 
@@ -13,11 +14,12 @@
 
 #include "VK/Debug.h"
 #include "VK/Instance.h"
+#include "VK/Pipeline/Pipelines.h"
 #include "VK/Swapchain.h"
 
 class VkApp : boost::noncopyable {
 public:
-  void OnCreate(const char *appName, int width, int height, GLFWwindow *window);
+  void OnCreate(const nlohmann::json &config, GLFWwindow *window);
   void OnDestroy();
 
 private:
@@ -26,7 +28,6 @@ private:
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
   void CreateRenderPass();
-  // void CreatePipeline();
 
   void CleanupSwapchain();
 
@@ -40,7 +41,8 @@ private:
 
   Instance instance_{};
   Swapchain swapchain_{};
-  VkRenderPass renderPass_{VK_NULL_HANDLE};
+  Pipelines pipelines_{};
+  VkRenderPass renderPass_ = VK_NULL_HANDLE;
   DebugMessenger debug_{};
 
   std::vector<const char *> validationLayers_ = {

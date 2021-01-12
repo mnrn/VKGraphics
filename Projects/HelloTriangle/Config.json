@@ -1,0 +1,16 @@
+{
+  "AppName" : "Hello Triangle",
+  "Width" : 1280,
+  "Height" : 720,
+  "Samples" : 0,
+  "Pipelines" : [
+    {
+      "VertexShader": "./Assets/SPIR-V/Primitives/Triangle.vs.spv",
+      "FragmentShader": "./Assets/SPIR-V/Primitives/Triangle.fs.spv",
+      "VertexAttribute": {
+        "Position": 0,
+        "Color": 1
+      }
+    }
+  ]
+}

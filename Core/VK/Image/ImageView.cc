@@ -6,7 +6,7 @@
 // Including files
 //*-----------------------------------------------------------------------------
 
-#include "VK/ImageView.h"
+#include "ImageView.h"
 
 #include <boost/assert.hpp>
 
