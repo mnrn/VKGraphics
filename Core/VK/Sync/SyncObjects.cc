@@ -30,7 +30,7 @@ void SyncObjects::Create(const Instance &instance, const Swapchain &swapchain,
   }
 }
 
-void SyncObjects::Cleanup(const Instance &instance, size_t frames) const {
+void SyncObjects::Destroy(const Instance &instance, size_t frames) const {
   for (size_t i = 0; i < frames; i++) {
     vkDestroyFence(instance.device, fences.inFlight[i], nullptr);
     vkDestroySemaphore(instance.device, semaphores.renderFinished[i],

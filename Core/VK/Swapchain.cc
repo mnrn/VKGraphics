@@ -133,7 +133,7 @@ void Swapchain::Create(const Instance &instance, int width, int height,
 
 const VkSwapchainKHR &Swapchain::Get() const { return handle; }
 
-void Swapchain::Cleanup(const Instance &instance) {
+void Swapchain::Destroy(const Instance &instance) {
   for (auto &view : views) {
     vkDestroyImageView(instance.device, view, nullptr);
   }

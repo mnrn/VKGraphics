@@ -16,7 +16,7 @@ struct Instance {
 
   [[nodiscard]]const VkInstance &Get() const;
   VkInstance *Set();
-  void Cleanup() const;
+  void Destroy() const;
 
   VkInstance instance = VK_NULL_HANDLE;
   VkDevice device = VK_NULL_HANDLE;

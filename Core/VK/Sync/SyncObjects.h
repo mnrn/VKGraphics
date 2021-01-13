@@ -11,7 +11,7 @@ struct Swapchain;
 struct SyncObjects {
   void Create(const Instance &instance, const Swapchain &swapchain,
               size_t frames);
-  void Cleanup(const Instance &instance, size_t frames) const;
+  void Destroy(const Instance &instance, size_t frames) const;
   Semaphores semaphores{};
   Fences fences{};
   size_t currentFrame = 0;

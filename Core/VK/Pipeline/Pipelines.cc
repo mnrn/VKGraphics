@@ -238,7 +238,7 @@ const VkPipeline &Pipelines::operator[](size_t index) const {
   return handles[index];
 }
 
-void Pipelines::Clear(const Instance &instance) {
+void Pipelines::Cleanup(const Instance &instance) {
   for (const auto &handle : handles) {
     vkDestroyPipeline(instance.device, handle, nullptr);
   }
@@ -246,7 +246,7 @@ void Pipelines::Clear(const Instance &instance) {
   vkDestroyPipelineLayout(instance.device, layout, nullptr);
 }
 
-void Pipelines::Cleanup(const Instance &instance) {
+void Pipelines::Destroy(const Instance &instance) {
   vkDestroySampler(instance.device, sampler, nullptr);
   if (descriptor.pool != VK_NULL_HANDLE) {
     vkDestroyDescriptorPool(instance.device, descriptor.pool, nullptr);

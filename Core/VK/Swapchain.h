@@ -19,5 +19,5 @@ struct Swapchain {
 
   void Create(const Instance &instance, int width, int height, bool forceFifo);
   [[nodiscard]]const VkSwapchainKHR &Get() const;
-  void Cleanup(const Instance &);
+  void Destroy(const Instance &instance);
 };

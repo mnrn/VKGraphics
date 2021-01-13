@@ -20,8 +20,8 @@ public:
                          std::unordered_map<std::string, Texture> &textures,
                          size_t objects);
 #endif
-  void Clear(const Instance &);
-  void Cleanup(const Instance &);
+  void Cleanup(const Instance &instance);
+  void Destroy(const Instance &instance);
   const VkPipeline &operator[](size_t) const;
 
   VkPipelineLayout layout = VK_NULL_HANDLE;

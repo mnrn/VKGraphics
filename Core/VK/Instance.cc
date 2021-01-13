@@ -19,7 +19,7 @@ VkInstance *Instance::Set() {
   return &instance;
 }
 
-void Instance::Cleanup() const {
+void Instance::Destroy() const {
   vkDestroyDevice(device, nullptr);
   vkDestroySurfaceKHR(instance, surface, nullptr);
   vkDestroyInstance(instance, nullptr);
