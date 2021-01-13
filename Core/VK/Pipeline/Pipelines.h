@@ -2,10 +2,6 @@
 
 #include <vulkan/vulkan.h>
 
-/**
- * @brief Pipeline
- */
-
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <unordered_map>

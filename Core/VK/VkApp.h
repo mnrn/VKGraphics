@@ -17,12 +17,12 @@
 #include "VK/Instance.h"
 #include "VK/Pipeline/Pipelines.h"
 #include "VK/Swapchain.h"
+#include "VK/Sync/SyncObjects.h"
 
 class VkApp : boost::noncopyable {
 public:
   void OnCreate(const nlohmann::json &config, GLFWwindow *window);
   void OnDestroy();
-  void OnRender();
 
 private:
   void CreateInstance(const char *appName);
@@ -33,7 +33,6 @@ private:
   void CreateCommandPool();
   void CreateFramebuffers();
   void CreateDrawCommandBuffers();
-  void CreateSemaphores();
 
   void CleanupSwapchain();
 
@@ -52,10 +51,7 @@ private:
     size_t currentPush = 0;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
-  struct Semaphores {
-    std::vector<VkSemaphore> imageAvailable{};
-    std::vector<VkSemaphore> renderFinished{};
-  } semaphores_{};
+  SyncObjects syncs{};
 
   DebugMessenger debug_{};
 

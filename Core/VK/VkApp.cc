@@ -41,22 +41,13 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   CreateCommandPool();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
-  CreateSemaphores();
+  syncs.Create(instance_, swapchain_, kMaxFramesInFlight);
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Cleanup(instance_);
-  for (size_t i = 0; i < kMaxFramesInFlight; i++) {
-    if (semaphores_.renderFinished[i] != VK_NULL_HANDLE) {
-      vkDestroySemaphore(instance_.device, semaphores_.renderFinished[i],
-                         nullptr);
-    }
-    if (semaphores_.imageAvailable[i] != VK_NULL_HANDLE) {
-      vkDestroySemaphore(instance_.device, semaphores_.imageAvailable[i],
-                         nullptr);
-    }
-  }
+  syncs.Cleanup(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
   debug_.Cleanup(instance_.Get());
@@ -298,22 +289,6 @@ void VkApp::CreateDrawCommandBuffers() {
   RecordDrawCommands();
 }
 
-void VkApp::CreateSemaphores() {
-  semaphores_.imageAvailable.resize(kMaxFramesInFlight);
-  semaphores_.renderFinished.resize(kMaxFramesInFlight);
-
-  VkSemaphoreCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  for (size_t i = 0; i < kMaxFramesInFlight; i++) {
-    if (vkCreateSemaphore(instance_.device, &create, nullptr,
-                          &semaphores_.imageAvailable[i]) ||
-        vkCreateSemaphore(instance_.device, &create, nullptr,
-                          &semaphores_.renderFinished[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to create semaphores!");
-    }
-  }
-}
-
 void VkApp::CleanupSwapchain() {
 
   for (auto &framebuffer : framebuffers_) {
@@ -437,7 +412,7 @@ void VkApp::RecordDrawCommands() {
 
     // TODO: DepthStencil対応
     std::array<VkClearValue, 1> clear{};
-    clear[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+    clear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
     render.clearValueCount = static_cast<uint32_t>(clear.size());
     render.pClearValues = clear.data();
 
