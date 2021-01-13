@@ -7,7 +7,7 @@
 #include "JSON.h"
 
 namespace AppDelegate {
-  static void OnInit(int, int){}
+  static void OnInit(){}
   static void OnUpdate(float) {}
   static void OnDestroy(){}
 }

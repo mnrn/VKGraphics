@@ -53,7 +53,7 @@ public:
       return EXIT_FAILURE;
     }
 
-    OnInit(width_, height_);
+    OnInit();
 
     while (!glfwWindowShouldClose(window_) &&
            !glfwGetKey(window_, GLFW_KEY_ESCAPE)) {
