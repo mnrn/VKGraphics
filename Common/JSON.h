@@ -5,7 +5,7 @@
 #include <optional>
 
 namespace JSON {
-std::optional<nlohmann::json> Parse(const std::string& filepath) {
+static inline std::optional<nlohmann::json> Parse(const std::string& filepath) {
   std::ifstream ifs(filepath);
   if (!ifs) {
     return std::nullopt;
