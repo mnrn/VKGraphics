@@ -40,6 +40,7 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   pipelines_.Create(instance_, swapchain_, renderPass_, config["Pipelines"]);
   CreateCommandPool();
   CreateFramebuffers();
+  CreateDrawCommandBuffers();
 }
 
 void VkApp::OnDestroy() {
@@ -187,7 +188,8 @@ void VkApp::CreateRenderPass() {
   colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkAttachmentDescription depth{};
-  if (const auto format = DepthStencil::FindDepthFormat(instance_.physicalDevice)) {
+  if (const auto format =
+          DepthStencil::FindDepthFormat(instance_.physicalDevice)) {
     depth.format = format.value();
   } else {
     BOOST_ASSERT_MSG(false, "Failed to find supported depth format!");
@@ -208,7 +210,8 @@ void VkApp::CreateRenderPass() {
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorRef;
-  subpass.pDepthStencilAttachment = &depthRef;
+  subpass.pDepthStencilAttachment = nullptr;
+  //subpass.pDepthStencilAttachment = &depthRef;
 
   VkSubpassDependency dependency{};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -269,12 +272,29 @@ void VkApp::CreateFramebuffers() {
   }
 }
 
+void VkApp::CreateDrawCommandBuffers() {
+  commandBuffers_.draw.resize(framebuffers_.size());
+
+  VkCommandBufferAllocateInfo alloc{};
+  alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc.commandPool = instance_.pool;
+  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc.commandBufferCount = static_cast<uint32_t>(commandBuffers_.draw.size());
+  if (vkAllocateCommandBuffers(instance_.device, &alloc,
+                               commandBuffers_.draw.data())) {
+    BOOST_ASSERT_MSG(false, "Failed to alloc draw command buffers!");
+  }
+
+  RecordDrawCommands();
+}
 void VkApp::CleanupSwapchain() {
 
   for (auto &framebuffer : framebuffers_) {
     vkDestroyFramebuffer(instance_.device, framebuffer, nullptr);
   }
-
+  vkFreeCommandBuffers(instance_.device, instance_.pool,
+                       static_cast<uint32_t>(commandBuffers_.draw.size()),
+                       commandBuffers_.draw.data());
   pipelines_.Clear(instance_);
   vkDestroyRenderPass(instance_.device, renderPass_, nullptr);
   swapchain_.Cleanup(instance_);
@@ -368,4 +388,47 @@ float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
 #endif
 
   return score;
+}
+
+void VkApp::RecordDrawCommands() {
+  for (size_t i = 0; i < commandBuffers_.draw.size(); i++) {
+    VkCommandBufferBeginInfo begin{};
+    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    begin.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffers_.draw[i], &begin)) {
+      BOOST_ASSERT_MSG(false, "Failed to begin recording command buffer!");
+    }
+
+    VkRenderPassBeginInfo render{};
+    render.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render.renderPass = renderPass_;
+    render.framebuffer = framebuffers_[i];
+    render.renderArea.offset = {0, 0};
+    render.renderArea.extent = swapchain_.extent;
+
+    // TODO: DepthStencil対応
+    std::array<VkClearValue, 1> clear{};
+    clear[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+    render.clearValueCount = static_cast<uint32_t>(clear.size());
+    render.pClearValues = clear.data();
+
+    vkCmdBeginRenderPass(commandBuffers_.draw[i], &render,
+                         VK_SUBPASS_CONTENTS_INLINE);
+    {
+      // TODO: VertexArrayObjectとIndexArrayObjectの対応
+      // TODO: Model(DrawIndexed)対応
+      // TODO: 複数のPipelineへの対応
+      vkCmdBindPipeline(commandBuffers_.draw[i],
+                        VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
+      // とりあえず現時点では三角形ポリゴンを描画するだけ。
+      vkCmdDraw(commandBuffers_.draw[i], 3, 1, 0, 0);
+    }
+    vkCmdEndRenderPass(commandBuffers_.draw[i]);
+
+    if (vkEndCommandBuffer(commandBuffers_.draw[i])) {
+      BOOST_ASSERT_MSG(false, "Failed to record draw command buffer!");
+    }
+  }
 }

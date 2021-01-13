@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <vector>
+#include <array>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -30,15 +31,22 @@ private:
   void CreateRenderPass();
   void CreateCommandPool();
   void CreateFramebuffers();
+  void CreateDrawCommandBuffers();
 
   void CleanupSwapchain();
 
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
+  void RecordDrawCommands();
 
   Instance instance_{};
   Swapchain swapchain_{};
   Pipelines pipelines_{};
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
+  struct CommandBuffers {
+    std::vector<VkCommandBuffer> draw;
+    std::array<VkCommandBuffer, 3> push;
+    size_t currentPush = 0;
+  } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
   DebugMessenger debug_{};
 
