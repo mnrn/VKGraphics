@@ -32,6 +32,7 @@ private:
   void CreateCommandPool();
   void CreateFramebuffers();
   void CreateDrawCommandBuffers();
+  void CreateSemaphores();
 
   void CleanupSwapchain();
 
@@ -48,6 +49,10 @@ private:
     size_t currentPush = 0;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
+  struct Semaphores {
+    VkSemaphore imageAvailable = VK_NULL_HANDLE;
+    VkSemaphore renderFinished = VK_NULL_HANDLE;
+  } semaphores_{};
   DebugMessenger debug_{};
 
   std::vector<const char *> validationLayers_ = {

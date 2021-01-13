@@ -41,12 +41,18 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   CreateCommandPool();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
+  CreateSemaphores();
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Cleanup(instance_);
-
+  if (semaphores_.renderFinished != VK_NULL_HANDLE) {
+    vkDestroySemaphore(instance_.device, semaphores_.renderFinished, nullptr);
+  }
+  if (semaphores_.imageAvailable != VK_NULL_HANDLE) {
+    vkDestroySemaphore(instance_.device, semaphores_.imageAvailable, nullptr);
+  }
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
   debug_.Cleanup(instance_.Get());
@@ -211,7 +217,7 @@ void VkApp::CreateRenderPass() {
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorRef;
   subpass.pDepthStencilAttachment = nullptr;
-  //subpass.pDepthStencilAttachment = &depthRef;
+  // subpass.pDepthStencilAttachment = &depthRef;
 
   VkSubpassDependency dependency{};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -287,6 +293,18 @@ void VkApp::CreateDrawCommandBuffers() {
 
   RecordDrawCommands();
 }
+
+void VkApp::CreateSemaphores() {
+  VkSemaphoreCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  if (vkCreateSemaphore(instance_.device, &create, nullptr,
+                        &semaphores_.imageAvailable) ||
+      vkCreateSemaphore(instance_.device, &create, nullptr,
+                        &semaphores_.renderFinished)) {
+    BOOST_ASSERT_MSG(false, "Failed to create semaphores!");
+  }
+}
+
 void VkApp::CleanupSwapchain() {
 
   for (auto &framebuffer : framebuffers_) {
