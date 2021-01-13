@@ -22,6 +22,7 @@ class VkApp : boost::noncopyable {
 public:
   void OnCreate(const nlohmann::json &config, GLFWwindow *window);
   void OnDestroy();
+  void OnRender();
 
 private:
   void CreateInstance(const char *appName);
@@ -39,6 +40,8 @@ private:
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
   void RecordDrawCommands();
 
+  static constexpr size_t kMaxFramesInFlight = 2;
+
   Instance instance_{};
   Swapchain swapchain_{};
   Pipelines pipelines_{};
@@ -50,9 +53,10 @@ private:
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
   struct Semaphores {
-    VkSemaphore imageAvailable = VK_NULL_HANDLE;
-    VkSemaphore renderFinished = VK_NULL_HANDLE;
+    std::vector<VkSemaphore> imageAvailable{};
+    std::vector<VkSemaphore> renderFinished{};
   } semaphores_{};
+
   DebugMessenger debug_{};
 
   std::vector<const char *> validationLayers_ = {

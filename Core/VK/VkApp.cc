@@ -47,11 +47,15 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Cleanup(instance_);
-  if (semaphores_.renderFinished != VK_NULL_HANDLE) {
-    vkDestroySemaphore(instance_.device, semaphores_.renderFinished, nullptr);
-  }
-  if (semaphores_.imageAvailable != VK_NULL_HANDLE) {
-    vkDestroySemaphore(instance_.device, semaphores_.imageAvailable, nullptr);
+  for (size_t i = 0; i < kMaxFramesInFlight; i++) {
+    if (semaphores_.renderFinished[i] != VK_NULL_HANDLE) {
+      vkDestroySemaphore(instance_.device, semaphores_.renderFinished[i],
+                         nullptr);
+    }
+    if (semaphores_.imageAvailable[i] != VK_NULL_HANDLE) {
+      vkDestroySemaphore(instance_.device, semaphores_.imageAvailable[i],
+                         nullptr);
+    }
   }
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
@@ -295,13 +299,18 @@ void VkApp::CreateDrawCommandBuffers() {
 }
 
 void VkApp::CreateSemaphores() {
+  semaphores_.imageAvailable.resize(kMaxFramesInFlight);
+  semaphores_.renderFinished.resize(kMaxFramesInFlight);
+
   VkSemaphoreCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  if (vkCreateSemaphore(instance_.device, &create, nullptr,
-                        &semaphores_.imageAvailable) ||
-      vkCreateSemaphore(instance_.device, &create, nullptr,
-                        &semaphores_.renderFinished)) {
-    BOOST_ASSERT_MSG(false, "Failed to create semaphores!");
+  for (size_t i = 0; i < kMaxFramesInFlight; i++) {
+    if (vkCreateSemaphore(instance_.device, &create, nullptr,
+                          &semaphores_.imageAvailable[i]) ||
+        vkCreateSemaphore(instance_.device, &create, nullptr,
+                          &semaphores_.renderFinished[i])) {
+      BOOST_ASSERT_MSG(false, "Failed to create semaphores!");
+    }
   }
 }
 
