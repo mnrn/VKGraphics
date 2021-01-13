@@ -45,9 +45,9 @@ public:
     glfwTerminate();
   }
 
-  template <typename Initialize, typename Update, typename Render,
+  template <typename Initialize, typename Update,
             typename Destroy>
-  int Run(Initialize OnInit, Update OnUpdate, Render OnRender,
+  int Run(Initialize OnInit, Update OnUpdate,
           Destroy OnDestroy) {
     if (window_ == nullptr) {
       return EXIT_FAILURE;
@@ -57,13 +57,12 @@ public:
 
     while (!glfwWindowShouldClose(window_) &&
            !glfwGetKey(window_, GLFW_KEY_ESCAPE)) {
+      glfwPollEvents();
 
       OnUpdate(static_cast<float>(glfwGetTime()));
-      OnRender();
-
-      glfwSwapBuffers(window_);
-      glfwPollEvents();
+      vkImpl_.OnRender();
     }
+    vkImpl_.WaitIdle();
 
     OnDestroy();
     return EXIT_SUCCESS;

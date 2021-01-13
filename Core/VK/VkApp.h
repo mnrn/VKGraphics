@@ -23,7 +23,9 @@ class VkApp : boost::noncopyable {
 public:
   void OnCreate(const nlohmann::json &config, GLFWwindow *window);
   void OnDestroy();
+  void OnRender();
 
+  void WaitIdle() const;
 private:
   void CreateInstance(const char *appName);
   void CreateSurface(GLFWwindow *window);
@@ -51,7 +53,7 @@ private:
     size_t currentPush = 0;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
-  SyncObjects syncs{};
+  SyncObjects syncs_{};
 
   DebugMessenger debug_{};
 
