@@ -6,9 +6,15 @@
 
 #include "JSON.h"
 
+namespace AppDelegate {
+  static void OnInit(int, int){}
+  static void OnUpdate(float) {}
+  static void OnDestroy(){}
+}
+
 int main() {
   const auto config = JSON::Parse("./Projects/HelloTriangle/Config.json");
   BOOST_ASSERT_MSG(config, "Failed to open Config.json!");
   App app(config.value());
-  return 0;
+  return app.Run(AppDelegate::OnInit, AppDelegate::OnUpdate, AppDelegate::OnDestroy);
 }

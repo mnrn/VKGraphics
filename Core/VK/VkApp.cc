@@ -41,19 +41,82 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   CreateCommandPool();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
-  syncs.Create(instance_, swapchain_, kMaxFramesInFlight);
+  syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Cleanup(instance_);
-  syncs.Cleanup(instance_, kMaxFramesInFlight);
+  syncs_.Cleanup(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
   debug_.Cleanup(instance_.Get());
 #endif
   instance_.Cleanup();
 }
+
+//*-----------------------------------------------------------------------------
+// Render
+//*-----------------------------------------------------------------------------
+
+void VkApp::OnRender() {
+  const size_t id = syncs_.currentFrame;
+  vkWaitForFences(instance_.device, 1, &syncs_.fences.inFlight[id], VK_TRUE,
+                  std::numeric_limits<uint64_t>::max());
+  uint32_t image;
+  //TODO: Swapchain Recreation 対応
+  vkAcquireNextImageKHR(
+      instance_.device, swapchain_.Get(), std::numeric_limits<uint64_t>::max(),
+      syncs_.semaphores.imageAvailable[id], VK_NULL_HANDLE, &image);
+
+  if (syncs_.fences.imagesInFlight[image] != VK_NULL_HANDLE) {
+    vkWaitForFences(instance_.device, 1,
+                    &syncs_.fences.imagesInFlight[image], VK_TRUE,
+                    std::numeric_limits<uint64_t>::max());
+  }
+  syncs_.fences.imagesInFlight[image] = syncs_.fences.inFlight[id];
+
+  VkSubmitInfo submit{};
+  submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+  VkSemaphore waitSems[] = {syncs_.semaphores.imageAvailable[id]};
+  VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+  submit.waitSemaphoreCount = 1;
+  submit.pWaitSemaphores = waitSems;
+  submit.pWaitDstStageMask = waitStages;
+
+  submit.commandBufferCount = 1;
+  submit.pCommandBuffers = &commandBuffers_.draw[image];
+
+  VkSemaphore signalSems[] = {syncs_.semaphores.renderFinished[id]};
+  submit.signalSemaphoreCount = 1;
+  submit.pSignalSemaphores = signalSems;
+
+  vkResetFences(instance_.device, 1, &syncs_.fences.inFlight[id]);
+
+  if (vkQueueSubmit(instance_.queues.graphics, 1, &submit, syncs_.fences.inFlight[id])) {
+    BOOST_ASSERT_MSG(false, "Failed to submit draw command buffer!");
+  }
+
+  VkPresentInfoKHR present{};
+  present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  present.waitSemaphoreCount = 1;
+  present.pWaitSemaphores = signalSems;
+  present.swapchainCount = 1;
+  present.pSwapchains = &swapchain_.Get();
+  present.pImageIndices = &image;
+
+  //TODO: Swapchain Recreation 対応
+  vkQueuePresentKHR(instance_.queues.presentation, &present);
+
+  syncs_.currentFrame = (id + 1) % kMaxFramesInFlight;
+}
+
+//*-----------------------------------------------------------------------------
+// Wait
+//*-----------------------------------------------------------------------------
+
+void VkApp::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
 
 //*-----------------------------------------------------------------------------
 // Create & Destroy
