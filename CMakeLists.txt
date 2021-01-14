@@ -8,16 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED)
 set(PROJECT_NAME ReVK)
 project(${PROJECT_NAME})
 
-set(PROJECTS_DIR_NAME projects)
+set(PROJECTS_DIR_NAME Projects)
 include_directories(SYSTEM third-party)
 include_directories(Core)
 include_directories(Common)
-
-# Compile mode
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO, "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g -pg -O3")
-set(CMAKE_CXX_FLAGS_RELEASE, "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG -O4 -flto")
-set(CMAKE_CXX_FLAGS_MINSIZEREL, "${CMAKE_CXX_FLAGS_MINSIZEREL} -DNDEBUG -Oz")
 
 # vulkan
 find_package(Vulkan REQUIRED)
@@ -37,25 +31,9 @@ find_library(GLFW_LIBRARIES
 )
 message("@@ GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
 
-# freetype
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-    set(FREETYPE_LIBRARIES_HINTS ${CMAKE_SOURCE_DIR}/Lib/freetype/debug)
-else ()
-    set(FREETYPE_LIBRARIES_HINTS ${CMAKE_SOURCE_DIR}/Lib/freetype/release)
-endif()
-find_library(FREETYPE_LIBRARIES
-  NAMES
-    freetype
-  HINTS
-    ${FREETYPE_LIBRARIES_HINTS}
-)
-message("@@ FREETYPE_LIBRARIES: ${FREETYPE_LIBRARIES}")
-include_directories(SYSTEM third-party/freetype2)
+# imgui
 include_directories(SYSTEM third-party/imgui)
 
-
-# Set preprocessor defines
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -D_USE_MATH_DEFINES")
 
 # Warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
@@ -98,7 +76,6 @@ function(build TARGET_NAME)
         ${Vulkan_LIBRARY}
         ${CMAKE_THREAD_LIBS_INIT}
         ${GLFW_LIBRARIES}
-        ${FREETYPE_LIBRARIES}
     )
 endfunction(build)
 
