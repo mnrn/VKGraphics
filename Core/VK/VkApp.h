@@ -21,30 +21,34 @@
 
 class VkApp : boost::noncopyable {
 public:
-  void OnCreate(const nlohmann::json &config, GLFWwindow *window);
-  void OnDestroy();
-  void OnRender();
+  VkApp() = default;
+  virtual ~VkApp() = default;
+
+  virtual void OnInit(const nlohmann::json &config, GLFWwindow *window);
+  virtual void OnDestroy();
+  virtual void OnUpdate(float t);
+  virtual void OnRender();
 
   void WaitIdle() const;
 
   static void OnResized(GLFWwindow* window, int width, int height);
 
-private:
+protected:
   void CreateInstance(const char *appName);
   void CreateSurface();
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
-  void CreateRenderPass();
-  void CreateCommandPool();
-  void CreateFramebuffers();
-  void CreateDrawCommandBuffers();
-
-  void CleanupSwapchain();
-
-  void RecreateSwapchain();
-
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
-  void RecordDrawCommands();
+
+  virtual void CreateRenderPass();
+  virtual void CreateCommandPool();
+  virtual void CreateFramebuffers();
+  virtual void CreateDrawCommandBuffers();
+
+  virtual void RecordDrawCommands();
+
+  virtual void CleanupSwapchain();
+  virtual void RecreateSwapchain();
 
   static constexpr size_t kMaxFramesInFlight = 2;
 

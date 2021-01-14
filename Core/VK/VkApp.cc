@@ -23,7 +23,7 @@
 // Init & Deinit
 //*-----------------------------------------------------------------------------
 
-void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
+void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   config_ = config;
   window_ = window;
 
@@ -58,9 +58,7 @@ void VkApp::OnDestroy() {
   instance_.Destroy();
 }
 
-//*-----------------------------------------------------------------------------
-// Render
-//*-----------------------------------------------------------------------------
+void VkApp::OnUpdate(float) {}
 
 void VkApp::OnRender() {
   const size_t id = syncs_.currentFrame;
@@ -127,15 +125,8 @@ void VkApp::OnRender() {
   syncs_.currentFrame = (id + 1) % kMaxFramesInFlight;
 }
 
-//*-----------------------------------------------------------------------------
-// Wait
-//*-----------------------------------------------------------------------------
 
 void VkApp::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
-
-//*-----------------------------------------------------------------------------
-// Callbacks
-//*-----------------------------------------------------------------------------
 
 void VkApp::OnResized(GLFWwindow *window, int, int) {
   auto app = reinterpret_cast<VkApp *>(glfwGetWindowUserPointer(window));
