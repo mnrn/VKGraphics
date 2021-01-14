@@ -24,7 +24,7 @@ static inline GLFWwindow *Create(int w, int h, const char *title, int samples,
                                  GLFWmonitor *monitor = nullptr,
                                  GLFWwindow *share = nullptr) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+  glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 
   if (samples > 0) {
     glfwWindowHint(GLFW_SAMPLES, samples);

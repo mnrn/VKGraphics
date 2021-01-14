@@ -378,24 +378,18 @@ void VkApp::CreateDrawCommandBuffers() {
 
 void VkApp::RecreateSwapchain() {
   // Windowが最小化されている場合framebufferのresizeが行われるまで待ちます。
-  if (window_ != nullptr) {
-    int w = 0;
-    int h = 0;
-    glfwGetFramebufferSize(window_, &w, &h);
-    while (w == 0 || h == 0) {
-      glfwGetFramebufferSize(window_, &w, &h);
-      glfwWaitEvents();
-    }
+  int width = 0;
+  int height = 0;
+  glfwGetFramebufferSize(window_, &width, &height);
+  while (width == 0 || height == 0) {
+    glfwGetFramebufferSize(window_, &width, &height);
+    glfwWaitEvents();
   }
 
   vkDeviceWaitIdle(instance_.device);
 
   CleanupSwapchain();
 
-  const auto width = config_["Width"].get<int>();
-  const auto height = config_["Height"].get<int>();
-
-  CreateLogicalDevice();
   swapchain_.Create(instance_, width, height);
   CreateRenderPass();
   pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);

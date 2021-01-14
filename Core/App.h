@@ -30,11 +30,11 @@ public:
     }
 
     const auto appName = config["AppName"].get<std::string>();
-    width_ = config["Width"].get<int>();
-    height_ = config["Height"].get<int>();
+    const auto width = config["Width"].get<int>();
+    const auto height = config["Height"].get<int>();
     const auto samples = config["Samples"].get<int>();
 
-    window_ = Window::Create(width_, height_, appName.c_str(), samples);
+    window_ = Window::Create(width, height, appName.c_str(), samples);
 
     glfwSetWindowUserPointer(window_, &vkImpl_);
     glfwSetFramebufferSizeCallback(window_, VkApp::OnResized);
@@ -72,9 +72,6 @@ public:
 
 protected:
   GLFWwindow *window_ = nullptr;
-  int width_;
-  int height_;
-
   VkApp vkImpl_;
 };
 
