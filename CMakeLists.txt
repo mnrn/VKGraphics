@@ -61,6 +61,7 @@ function(build TARGET_NAME)
         Core/VK/Pipeline/*.cc
         Core/VK/Buffer/*.cc
         Core/VK/Sync/*.cc
+        Core/VK/Primitive/*.cc
         ${PROJECTS_DIR_NAME}/${TARGET_NAME}/*.cc
     )
     set(MAIN_CC ${TARGET_NAME}/${TARGET_NAME}/Main.cc)

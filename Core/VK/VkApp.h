@@ -4,15 +4,16 @@
 
 #pragma once
 
+#include <array>
 #include <boost/noncopyable.hpp>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <vector>
-#include <array>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "VK/Buffer/VertexBuffer.h"
 #include "VK/Debug.h"
 #include "VK/Instance.h"
 #include "VK/Pipeline/Pipelines.h"
@@ -27,24 +28,24 @@ public:
 
   void WaitIdle() const;
 
-  static void OnResized(GLFWwindow* window, int width, int height);
+  static void OnResized(GLFWwindow *window, int width, int height);
 
-private:
+protected:
   void CreateInstance(const char *appName);
   void CreateSurface();
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
+  float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
+
   void CreateRenderPass();
   void CreateCommandPool();
   void CreateFramebuffers();
+  void CreateVertexBuffer();
   void CreateDrawCommandBuffers();
+  void RecordDrawCommands();
 
   void CleanupSwapchain();
-
   void RecreateSwapchain();
-
-  float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
-  void RecordDrawCommands();
 
   static constexpr size_t kMaxFramesInFlight = 2;
 
@@ -58,9 +59,10 @@ private:
     size_t currentPush = 0;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
+  VertexBuffer vertexBuffer_;
   SyncObjects syncs_{};
 
-  GLFWwindow* window_ = nullptr;
+  GLFWwindow *window_ = nullptr;
   nlohmann::json config_{};
   bool isFramebufferResized_ = false;
 #if !defined(NDEBUG)

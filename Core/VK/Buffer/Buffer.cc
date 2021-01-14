@@ -2,6 +2,7 @@
 
 #include <boost/assert.hpp>
 
+#include "VK/Buffer/Command.h"
 #include "VK/Buffer/Memory.h"
 #include "VK/Instance.h"
 
@@ -24,7 +25,8 @@ void Create(const Instance &instance, VkDeviceSize size,
   VkMemoryAllocateInfo alloc{};
   alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   alloc.allocationSize = req.size;
-  if (const auto type =  Memory::FindType(req.memoryTypeBits, memProp, instance.physicalDevice)) {
+  if (const auto type = Memory::FindType(req.memoryTypeBits, memProp,
+                                         instance.physicalDevice)) {
     alloc.memoryTypeIndex = type.value();
   } else {
     BOOST_ASSERT_MSG(false, "Failed to find memory type!");
@@ -34,5 +36,15 @@ void Create(const Instance &instance, VkDeviceSize size,
     BOOST_ASSERT_MSG(false, "Failed to allocate buffer memory!");
   }
   vkBindBufferMemory(instance.device, buffer, memory, 0);
+}
+
+void Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
+          VkDeviceSize size) {
+  VkCommandBuffer command = Command::BeginSingleTime(instance);
+
+  VkBufferCopy copy{};
+  copy.size = size;
+  vkCmdCopyBuffer(command, src, dst, 1, &copy);
+  Command::EndSingleTime(instance, command);
 }
 } // namespace Buffer

@@ -14,6 +14,7 @@
 #include "VK/Image/Texture.h"
 #include "VK/Instance.h"
 #include "VK/Swapchain.h"
+#include "VK/Primitive/Vertex.h"
 
 #define SHADER_ENTRY_POINT "main"
 
@@ -110,11 +111,14 @@ void Pipelines::Create(const Instance &instance, const Swapchain &swapchain,
                      nullptr, modules, stages);
     }
 
-    // TODO: VertexInput対応
+    auto binds = Vertex::Bindings();
+    auto attrs = Vertex::Attributes();
     VkPipelineVertexInputStateCreateInfo vi{};
     vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vi.vertexBindingDescriptionCount = 0;
-    vi.vertexAttributeDescriptionCount = 0;
+    vi.vertexBindingDescriptionCount = static_cast<uint32_t>(binds.size());
+    vi.pVertexBindingDescriptions = binds.data();
+    vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+    vi.pVertexAttributeDescriptions = attrs.data();
 
     VkPipelineInputAssemblyStateCreateInfo as{};
     as.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

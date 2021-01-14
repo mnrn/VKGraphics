@@ -1,6 +1,7 @@
-#version 410
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
 
-in vec3 Color;
+layout (location=0) in vec3 Color;
 layout (location=0) out vec4 FragColor;
 
 void main()

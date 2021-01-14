@@ -43,6 +43,7 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
   CreateCommandPool();
   CreateFramebuffers();
+  CreateVertexBuffer();
   CreateDrawCommandBuffers();
   syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
 }
@@ -50,6 +51,7 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Destroy(instance_);
+  vertexBuffer_.Destroy(instance_);
   syncs_.Destroy(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
@@ -360,6 +362,8 @@ void VkApp::CreateFramebuffers() {
   }
 }
 
+void VkApp::CreateVertexBuffer() {}
+
 void VkApp::CreateDrawCommandBuffers() {
   commandBuffers_.draw.resize(framebuffers_.size());
 
@@ -526,13 +530,20 @@ void VkApp::RecordDrawCommands() {
     vkCmdBeginRenderPass(commandBuffers_.draw[i], &render,
                          VK_SUBPASS_CONTENTS_INLINE);
     {
-      // TODO: VertexArrayObjectとIndexArrayObjectの対応
-      // TODO: Model(DrawIndexed)対応
-      // TODO: 複数のPipelineへの対応
+      // TODO: VertexBufferObjectとIndexBufferObjectの対応
+      // TODO: DrawIndexed対応
+      // TODO: 複数のModelとPipelineの対応
       vkCmdBindPipeline(commandBuffers_.draw[i],
                         VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
-      // とりあえず現時点では三角形ポリゴンを描画するだけ。
-      vkCmdDraw(commandBuffers_.draw[i], 3, 1, 0, 0);
+
+      std::vector<VkBuffer> vertex = {vertexBuffer_.buffer};
+      VkDeviceSize offsets[] = {0};
+      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0,
+                             static_cast<uint32_t>(vertex.size()),
+                             vertex.data(), offsets);
+
+      vkCmdDraw(commandBuffers_.draw[i],
+                static_cast<uint32_t>(vertexBuffer_.vertices.size()), 1, 0, 0);
     }
     vkCmdEndRenderPass(commandBuffers_.draw[i]);
 
