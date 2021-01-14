@@ -2,13 +2,9 @@ cmake_minimum_required(VERSION 3.12)
 cmake_policy(VERSION 3.12)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED)
 
-project(dummy NONE)
-  if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    set(CMAKE_CXX_COMPILER clang++)
-  endif()
 set(PROJECT_NAME ReVK)
 project(${PROJECT_NAME})
 

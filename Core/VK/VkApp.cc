@@ -24,20 +24,23 @@
 //*-----------------------------------------------------------------------------
 
 void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
-  const auto appName = config["AppName"].get<std::string>();
-  const auto width = config["Width"].get<int>();
-  const auto height = config["Height"].get<int>();
+  config_ = config;
+  window_ = window;
+
+  const auto appName = config_["AppName"].get<std::string>();
+  const auto width = config_["Width"].get<int>();
+  const auto height = config_["Height"].get<int>();
 
   CreateInstance(appName.c_str());
 #if !defined(NDEBUG)
   debug_.Setup(instance_.Get());
 #endif
-  CreateSurface(window);
+  CreateSurface();
   SelectPhysicalDevice();
   CreateLogicalDevice();
-  swapchain_.Create(instance_, width, height, false);
+  swapchain_.Create(instance_, width, height);
   CreateRenderPass();
-  pipelines_.Create(instance_, swapchain_, renderPass_, config["Pipelines"]);
+  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
   CreateCommandPool();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
@@ -64,15 +67,19 @@ void VkApp::OnRender() {
   vkWaitForFences(instance_.device, 1, &syncs_.fences.inFlight[id], VK_TRUE,
                   std::numeric_limits<uint64_t>::max());
   uint32_t image;
-  //TODO: Swapchain Recreation 対応
-  vkAcquireNextImageKHR(
+  VkResult result = vkAcquireNextImageKHR(
       instance_.device, swapchain_.Get(), std::numeric_limits<uint64_t>::max(),
       syncs_.semaphores.imageAvailable[id], VK_NULL_HANDLE, &image);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    RecreateSwapchain();
+    return;
+  } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    BOOST_ASSERT_MSG(false, "Failed to acquire swap chain image!");
+  }
 
   if (syncs_.fences.imagesInFlight[image] != VK_NULL_HANDLE) {
-    vkWaitForFences(instance_.device, 1,
-                    &syncs_.fences.imagesInFlight[image], VK_TRUE,
-                    std::numeric_limits<uint64_t>::max());
+    vkWaitForFences(instance_.device, 1, &syncs_.fences.imagesInFlight[image],
+                    VK_TRUE, std::numeric_limits<uint64_t>::max());
   }
   syncs_.fences.imagesInFlight[image] = syncs_.fences.inFlight[id];
 
@@ -80,7 +87,8 @@ void VkApp::OnRender() {
   submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
   VkSemaphore waitSems[] = {syncs_.semaphores.imageAvailable[id]};
-  VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+  VkPipelineStageFlags waitStages[] = {
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   submit.waitSemaphoreCount = 1;
   submit.pWaitSemaphores = waitSems;
   submit.pWaitDstStageMask = waitStages;
@@ -94,7 +102,8 @@ void VkApp::OnRender() {
 
   vkResetFences(instance_.device, 1, &syncs_.fences.inFlight[id]);
 
-  if (vkQueueSubmit(instance_.queues.graphics, 1, &submit, syncs_.fences.inFlight[id])) {
+  if (vkQueueSubmit(instance_.queues.graphics, 1, &submit,
+                    syncs_.fences.inFlight[id])) {
     BOOST_ASSERT_MSG(false, "Failed to submit draw command buffer!");
   }
 
@@ -106,8 +115,14 @@ void VkApp::OnRender() {
   present.pSwapchains = &swapchain_.Get();
   present.pImageIndices = &image;
 
-  //TODO: Swapchain Recreation 対応
-  vkQueuePresentKHR(instance_.queues.presentation, &present);
+  result = vkQueuePresentKHR(instance_.queues.presentation, &present);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+      isFramebufferResized_) {
+    isFramebufferResized_ = false;
+    RecreateSwapchain();
+  } else if (result != VK_SUCCESS) {
+    BOOST_ASSERT_MSG(false, "Failed to present swap chain image!");
+  }
 
   syncs_.currentFrame = (id + 1) % kMaxFramesInFlight;
 }
@@ -117,6 +132,15 @@ void VkApp::OnRender() {
 //*-----------------------------------------------------------------------------
 
 void VkApp::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
+
+//*-----------------------------------------------------------------------------
+// Callbacks
+//*-----------------------------------------------------------------------------
+
+void VkApp::OnResized(GLFWwindow *window, int, int) {
+  auto app = reinterpret_cast<VkApp *>(glfwGetWindowUserPointer(window));
+  app->isFramebufferResized_ = true;
+}
 
 //*-----------------------------------------------------------------------------
 // Create & Destroy
@@ -163,8 +187,8 @@ void VkApp::CreateInstance(const char *appName) {
   }
 }
 
-void VkApp::CreateSurface(GLFWwindow *window) {
-  if (glfwCreateWindowSurface(instance_.Get(), window, nullptr,
+void VkApp::CreateSurface() {
+  if (glfwCreateWindowSurface(instance_.Get(), window_, nullptr,
                               &instance_.surface)) {
     BOOST_ASSERT_MSG(false, "Failed to create window surface!");
   }
@@ -352,8 +376,34 @@ void VkApp::CreateDrawCommandBuffers() {
   RecordDrawCommands();
 }
 
-void VkApp::CleanupSwapchain() {
+void VkApp::RecreateSwapchain() {
+  // Windowが最小化されている場合framebufferのresizeが行われるまで待ちます。
+  if (window_ != nullptr) {
+    int w = 0;
+    int h = 0;
+    glfwGetFramebufferSize(window_, &w, &h);
+    while (w == 0 || h == 0) {
+      glfwGetFramebufferSize(window_, &w, &h);
+      glfwWaitEvents();
+    }
+  }
 
+  vkDeviceWaitIdle(instance_.device);
+
+  CleanupSwapchain();
+
+  const auto width = config_["Width"].get<int>();
+  const auto height = config_["Height"].get<int>();
+
+  CreateLogicalDevice();
+  swapchain_.Create(instance_, width, height);
+  CreateRenderPass();
+  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
+  CreateFramebuffers();
+  CreateDrawCommandBuffers();
+}
+
+void VkApp::CleanupSwapchain() {
   for (auto &framebuffer : framebuffers_) {
     vkDestroyFramebuffer(instance_.device, framebuffer, nullptr);
   }

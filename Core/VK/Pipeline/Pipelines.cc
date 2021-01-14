@@ -71,14 +71,15 @@ void Create(const Instance &instance, const std::string &filepath,
 void Pipelines::Create(const Instance &instance, const Swapchain &swapchain,
                        const VkRenderPass &renderPass,
                        const nlohmann::json &config) {
-  CreateDescriptorSetLayout(instance);
-  CreateTextureSampler(instance);
+  //CreateDescriptorSetLayout(instance);
+  //CreateTextureSampler(instance);
 
   {
     VkPipelineLayoutCreateInfo create{};
     create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create.setLayoutCount = 1;
-    create.pSetLayouts = &descriptor.layout;
+    create.setLayoutCount = 0;
+    //create.setLayoutCount = 1;
+    //create.pSetLayouts = &descriptor.layout;
     if (vkCreatePipelineLayout(instance.device, &create, nullptr, &layout)) {
       BOOST_ASSERT_MSG(false, "Failed to create pipeline layout");
     }

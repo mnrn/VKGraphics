@@ -24,16 +24,20 @@
 
 class App : private boost::noncopyable {
 public:
-  explicit App(const nlohmann::json& config) {
+  explicit App(const nlohmann::json &config) {
     if (glfwInit() == GL_FALSE) {
       BOOST_ASSERT_MSG(false, "glfw Initialization failed!");
     }
+
     const auto appName = config["AppName"].get<std::string>();
     width_ = config["Width"].get<int>();
     height_ = config["Height"].get<int>();
     const auto samples = config["Samples"].get<int>();
+
     window_ = Window::Create(width_, height_, appName.c_str(), samples);
-    glfwGetFramebufferSize(window_, &width_, &height_);
+
+    glfwSetWindowUserPointer(window_, &vkImpl_);
+    glfwSetFramebufferSizeCallback(window_, VkApp::OnResized);
 
     vkImpl_.OnCreate(config, window_);
   }
@@ -45,10 +49,8 @@ public:
     glfwTerminate();
   }
 
-  template <typename Initialize, typename Update,
-            typename Destroy>
-  int Run(Initialize OnInit, Update OnUpdate,
-          Destroy OnDestroy) {
+  template <typename Initialize, typename Update, typename Destroy>
+  int Run(Initialize OnInit, Update OnUpdate, Destroy OnDestroy) {
     if (window_ == nullptr) {
       return EXIT_FAILURE;
     }

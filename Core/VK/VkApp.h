@@ -26,9 +26,12 @@ public:
   void OnRender();
 
   void WaitIdle() const;
+
+  static void OnResized(GLFWwindow* window, int width, int height);
+
 private:
   void CreateInstance(const char *appName);
-  void CreateSurface(GLFWwindow *window);
+  void CreateSurface();
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
   void CreateRenderPass();
@@ -37,6 +40,8 @@ private:
   void CreateDrawCommandBuffers();
 
   void CleanupSwapchain();
+
+  void RecreateSwapchain();
 
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
   void RecordDrawCommands();
@@ -55,12 +60,15 @@ private:
   std::vector<VkFramebuffer> framebuffers_{};
   SyncObjects syncs_{};
 
+  GLFWwindow* window_ = nullptr;
+  nlohmann::json config_{};
+  bool isFramebufferResized_ = false;
+#if !defined(NDEBUG)
   DebugMessenger debug_{};
-
+#endif
   std::vector<const char *> validationLayers_ = {
 #ifdef __APPLE__
       "VK_LAYER_KHRONOS_validation",
-      "VK_LAYER_LUNARG_api_dump",
 #else
 #endif
   };
