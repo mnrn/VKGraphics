@@ -38,13 +38,13 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreateSurface();
   SelectPhysicalDevice();
   CreateLogicalDevice();
-  swapchain_.Create(instance_, width, height);
+  CreateSwapchain(width, height);
   CreateRenderPass();
-  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
+  CreatePipelines();
   CreateCommandPool();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
-  syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
+  CreateSyncObjects();
 }
 
 void VkApp::OnDestroy() {
@@ -251,6 +251,10 @@ void VkApp::CreateLogicalDevice() {
                    &instance_.queues.presentation);
 }
 
+void VkApp::CreateSwapchain(int w, int h) {
+  swapchain_.Create(instance_, w, h);
+}
+
 void VkApp::CreateRenderPass() {
   VkAttachmentDescription color{};
   color.format = swapchain_.format;
@@ -317,6 +321,10 @@ void VkApp::CreateRenderPass() {
   }
 }
 
+void VkApp::CreatePipelines() {
+  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
+}
+
 void VkApp::CreateCommandPool() {
   QueueFamilies families = QueueFamilies::Find(instance_);
 
@@ -367,6 +375,14 @@ void VkApp::CreateDrawCommandBuffers() {
   RecordDrawCommands();
 }
 
+void VkApp::CreateSyncObjects() {
+  syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
+}
+
+//*-----------------------------------------------------------------------------
+// Swapchain Subroutine
+//*-----------------------------------------------------------------------------
+
 void VkApp::RecreateSwapchain() {
   // Windowが最小化されている場合framebufferのresizeが行われるまで待ちます。
   int width = 0;
@@ -381,9 +397,9 @@ void VkApp::RecreateSwapchain() {
 
   CleanupSwapchain();
 
-  swapchain_.Create(instance_, width, height);
+  CreateSwapchain(width, height);
   CreateRenderPass();
-  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
+  CreatePipelines();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
 }

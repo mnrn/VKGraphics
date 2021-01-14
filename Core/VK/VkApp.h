@@ -40,10 +40,13 @@ protected:
   void CreateLogicalDevice();
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
 
+  virtual void CreateSwapchain(int width, int height);
   virtual void CreateRenderPass();
+  virtual void CreatePipelines();
   virtual void CreateCommandPool();
   virtual void CreateFramebuffers();
   virtual void CreateDrawCommandBuffers();
+  virtual void CreateSyncObjects();
 
   virtual void RecordDrawCommands();
 
