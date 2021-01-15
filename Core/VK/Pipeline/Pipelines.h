@@ -13,15 +13,8 @@ struct Texture;
 
 struct Pipelines {
 public:
-  void Create(const Instance &instance, const Swapchain &swapchain,
-              const VkRenderPass &renderPass, const nlohmann::json &config);
-#if false
-  void CreateDescriptors(const Instance &instance,
-                         std::unordered_map<std::string, Texture> &textures,
-                         size_t objects);
-#endif
   void Cleanup(const Instance &instance);
-  void Destroy(const Instance &instance);
+  void Destroy(const Instance &instance) const;
   const VkPipeline &operator[](size_t) const;
 
   VkPipelineLayout layout = VK_NULL_HANDLE;
@@ -38,11 +31,4 @@ public:
     VkDeviceMemory localMemory = VK_NULL_HANDLE;
     uint32_t localAlignment = 0;
   } uniform;
-
-private:
-  void CreateDescriptorSetLayout(const Instance &);
-  void CreateTextureSampler(const Instance &);
-#if false
-  void CreateUniforms(const Instance &, size_t objects);
-#endif
 };
