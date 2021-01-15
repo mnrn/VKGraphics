@@ -41,14 +41,14 @@ protected:
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
 
   virtual void CreateSwapchain(int width, int height);
-  virtual void CreateRenderPass();
-  virtual void CreatePipelines();
+  virtual void CreateRenderPass() = 0;
+  virtual void CreatePipelines() = 0;
   virtual void CreateCommandPool();
-  virtual void CreateFramebuffers();
+  virtual void CreateFramebuffers() = 0;
   virtual void CreateDrawCommandBuffers();
   virtual void CreateSyncObjects();
 
-  virtual void RecordDrawCommands();
+  virtual void RecordDrawCommands() = 0;
 
   virtual void CleanupSwapchain();
   virtual void RecreateSwapchain();

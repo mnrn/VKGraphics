@@ -6,11 +6,7 @@
 
 #include "App.h"
 #include "JSON.h"
-#include "VK/VkApp.h"
-
-
-class HelloTriangle : public VkApp {};
-
+#include "HelloTriangle.h"
 
 int main() {
   const auto config = JSON::Parse("./Projects/HelloTriangle/Config.json");
