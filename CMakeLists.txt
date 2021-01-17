@@ -22,13 +22,13 @@ include_directories(${Vulkan_INCLUDE_DIR})
 
 # glfw
 find_library(GLFW_LIBRARIES
-  NAMES
+    NAMES
     glfw
     glfw3
     glfw3.3
-  HINTS
+    HINTS
     ${CMAKE_SOURCE_DIR}/Lib/glfw
-)
+    )
 message("@@ GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
 
 # imgui
@@ -36,11 +36,11 @@ include_directories(SYSTEM third-party/imgui)
 
 
 # Warnings
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wundef")
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Weverything")
-    
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++98-compat -Wno-c++98-compat-pedantic")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-zero-as-null-pointer-constant -Wno-sign-conversion -Wno-disabled-macro-expansion -Wno-undefined-func-template -Wno-deprecated-dynamic-exception-spec -Wno-undef") # for Boost
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-signed-enum-bitfield -Wno-shorten-64-to-32")
@@ -49,7 +49,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-poison-system-directories -Wno-ctad-maybe-unsupported")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-old-style-cast -Wno-double-promotion -Wno-unused-macros")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-documentation")
-endif()
+endif ()
 
 # Function for building
 function(build TARGET_NAME)
@@ -61,30 +61,29 @@ function(build TARGET_NAME)
         Core/VK/Pipeline/*.cc
         Core/VK/Buffer/*.cc
         Core/VK/Sync/*.cc
-        Core/VK/Primitive/*.cc
         ${PROJECTS_DIR_NAME}/${TARGET_NAME}/*.cc
-    )
+        )
     set(MAIN_CC ${TARGET_NAME}/${TARGET_NAME}/Main.cc)
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECTS_DIR_NAME}/${TARGET_NAME}/Main.cc)
         set(MAIN_CC ${PROJECTS_DIR_NAME}/${TARGET_NAME}/Main.cc)
-    endif()
+    endif ()
 
     add_executable(${TARGET_NAME}
         ${MAIN_CC}
         ${SOURCE}
-    )
-    target_link_libraries(${TARGET_NAME} 
+        )
+    target_link_libraries(${TARGET_NAME}
         ${Vulkan_LIBRARY}
         ${CMAKE_THREAD_LIBS_INIT}
         ${GLFW_LIBRARIES}
-    )
+        )
 endfunction(build)
 
 # Build All
 function(buildAll)
-    foreach(TARGET ${TARGETS})
+    foreach (TARGET ${TARGETS})
         build(${TARGET})
-    endforeach(TARGET)
+    endforeach (TARGET)
 endfunction(buildAll)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
@@ -93,5 +92,5 @@ set(TARGETS
     #ListsLayers
     #LoadValidationLayers
     HelloTriangle
-)
+    )
 buildAll()

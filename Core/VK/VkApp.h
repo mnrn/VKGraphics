@@ -20,11 +20,15 @@
 #include "VK/Swapchain.h"
 #include "VK/Sync/SyncObjects.h"
 
-class VkApp : boost::noncopyable {
+class VkApp : private boost::noncopyable {
 public:
-  void OnCreate(const nlohmann::json &config, GLFWwindow *window);
-  void OnDestroy();
-  void OnRender();
+  VkApp() = default;
+  virtual ~VkApp() = default;
+
+  virtual void OnInit(const nlohmann::json &config, GLFWwindow *window);
+  virtual void OnDestroy();
+  virtual void OnUpdate(float t);
+  virtual void OnRender();
 
   void WaitIdle() const;
 
@@ -37,15 +41,19 @@ protected:
   void CreateLogicalDevice();
   float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
 
-  void CreateRenderPass();
+  void CreateSwapchain(int width, int height);
   void CreateCommandPool();
-  void CreateFramebuffers();
-  void CreateVertexBuffer();
-  void CreateDrawCommandBuffers();
-  void RecordDrawCommands();
 
-  void CleanupSwapchain();
-  void RecreateSwapchain();
+  virtual void CreateRenderPass() = 0;
+  virtual void CreatePipelines() = 0;
+  virtual void CreateFramebuffers() = 0;
+  virtual void CreateDrawCommandBuffers();
+  virtual void RecordDrawCommands() = 0;
+
+  void CreateSyncObjects();
+
+  virtual void CleanupSwapchain();
+  virtual void RecreateSwapchain();
 
   static constexpr size_t kMaxFramesInFlight = 2;
 
@@ -59,7 +67,6 @@ protected:
     size_t currentPush = 0;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
-  VertexBuffer vertexBuffer_;
   SyncObjects syncs_{};
 
   GLFWwindow *window_ = nullptr;

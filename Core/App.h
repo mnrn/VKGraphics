@@ -13,6 +13,7 @@
 #include <boost/noncopyable.hpp>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <memory>
 
 #include "Common.h"
 #include "VK/VkApp.h"
@@ -35,44 +36,39 @@ public:
     const auto samples = config["Samples"].get<int>();
 
     window_ = Window::Create(width, height, appName.c_str(), samples);
-
-    glfwSetWindowUserPointer(window_, &vkImpl_);
-    glfwSetFramebufferSizeCallback(window_, VkApp::OnResized);
-
-    vkImpl_.OnCreate(config, window_);
+    config_ = config;
   }
 
   ~App() {
-    vkImpl_.OnDestroy();
-
     Window::Destroy(window_);
     glfwTerminate();
   }
 
-  template <typename Initialize, typename Update, typename Destroy>
-  int Run(Initialize OnInit, Update OnUpdate, Destroy OnDestroy) {
+  int Run(std::unique_ptr<VkApp> app) {
     if (window_ == nullptr) {
       return EXIT_FAILURE;
     }
 
-    OnInit();
+    glfwSetWindowUserPointer(window_, app.get());
+    glfwSetFramebufferSizeCallback(window_, VkApp::OnResized);
+    app->OnInit(config_, window_);
 
     while (!glfwWindowShouldClose(window_) &&
            !glfwGetKey(window_, GLFW_KEY_ESCAPE)) {
       glfwPollEvents();
 
-      OnUpdate(static_cast<float>(glfwGetTime()));
-      vkImpl_.OnRender();
+      app->OnUpdate(static_cast<float>(glfwGetTime()));
+      app->OnRender();
     }
-    vkImpl_.WaitIdle();
+    app->WaitIdle();
 
-    OnDestroy();
+    app->OnDestroy();
     return EXIT_SUCCESS;
   }
 
 protected:
   GLFWwindow *window_ = nullptr;
-  VkApp vkImpl_;
+  nlohmann::json config_{};
 };
 
 #endif // APP_HPP

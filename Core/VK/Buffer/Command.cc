@@ -10,7 +10,7 @@ VkCommandBuffer BeginSingleTime(const Instance &instance) {
   alloc.commandPool = instance.pool;
   alloc.commandBufferCount = 1;
 
-  VkCommnadBuffer command;
+  VkCommandBuffer command;
   vkAllocateCommandBuffers(instance.device, &alloc, &command);
 
   VkCommandBufferBeginInfo begin{};

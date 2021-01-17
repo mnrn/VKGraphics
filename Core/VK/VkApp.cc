@@ -13,7 +13,7 @@
 #include <map>
 #include <spdlog/spdlog.h>
 
-#include "VK/Buffer/DepthStencil.h"
+#include "VK/Pipeline/Shader.h"
 
 //*-----------------------------------------------------------------------------
 // Constant expressions
@@ -23,7 +23,7 @@
 // Init & Deinit
 //*-----------------------------------------------------------------------------
 
-void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
+void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   config_ = config;
   window_ = window;
 
@@ -38,20 +38,18 @@ void VkApp::OnCreate(const nlohmann::json &config, GLFWwindow *window) {
   CreateSurface();
   SelectPhysicalDevice();
   CreateLogicalDevice();
-  swapchain_.Create(instance_, width, height);
-  CreateRenderPass();
-  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
+  CreateSwapchain(width, height);
   CreateCommandPool();
+  CreateRenderPass();
+  CreatePipelines();
   CreateFramebuffers();
-  CreateVertexBuffer();
   CreateDrawCommandBuffers();
-  syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
+  CreateSyncObjects();
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
   pipelines_.Destroy(instance_);
-  vertexBuffer_.Destroy(instance_);
   syncs_.Destroy(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
@@ -60,9 +58,7 @@ void VkApp::OnDestroy() {
   instance_.Destroy();
 }
 
-//*-----------------------------------------------------------------------------
-// Render
-//*-----------------------------------------------------------------------------
+void VkApp::OnUpdate(float) {}
 
 void VkApp::OnRender() {
   const size_t id = syncs_.currentFrame;
@@ -129,15 +125,8 @@ void VkApp::OnRender() {
   syncs_.currentFrame = (id + 1) % kMaxFramesInFlight;
 }
 
-//*-----------------------------------------------------------------------------
-// Wait
-//*-----------------------------------------------------------------------------
 
 void VkApp::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
-
-//*-----------------------------------------------------------------------------
-// Callbacks
-//*-----------------------------------------------------------------------------
 
 void VkApp::OnResized(GLFWwindow *window, int, int) {
   auto app = reinterpret_cast<VkApp *>(glfwGetWindowUserPointer(window));
@@ -262,70 +251,8 @@ void VkApp::CreateLogicalDevice() {
                    &instance_.queues.presentation);
 }
 
-void VkApp::CreateRenderPass() {
-  VkAttachmentDescription color{};
-  color.format = swapchain_.format;
-  color.samples = VK_SAMPLE_COUNT_1_BIT;
-  color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  VkAttachmentReference colorRef{};
-  colorRef.attachment = 0;
-  colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentDescription depth{};
-  if (const auto format =
-          DepthStencil::FindDepthFormat(instance_.physicalDevice)) {
-    depth.format = format.value();
-  } else {
-    BOOST_ASSERT_MSG(false, "Failed to find supported depth format!");
-  }
-  depth.samples = VK_SAMPLE_COUNT_1_BIT;
-  depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  depth.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference depthRef{};
-  depthRef.attachment = 1;
-  depthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorRef;
-  subpass.pDepthStencilAttachment = nullptr;
-  // subpass.pDepthStencilAttachment = &depthRef;
-
-  VkSubpassDependency dependency{};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  // TODO: DepthStencil対応
-  std::vector<VkAttachmentDescription> attachments{color, /* depth */};
-  VkRenderPassCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  create.attachmentCount = static_cast<uint32_t>(attachments.size());
-  create.pAttachments = attachments.data();
-  create.subpassCount = 1;
-  create.pSubpasses = &subpass;
-  create.dependencyCount = 1;
-  create.pDependencies = &dependency;
-
-  if (vkCreateRenderPass(instance_.device, &create, nullptr, &renderPass_)) {
-    BOOST_ASSERT_MSG(false, "Failed to create render pass!");
-  }
+void VkApp::CreateSwapchain(int w, int h) {
+  swapchain_.Create(instance_, w, h);
 }
 
 void VkApp::CreateCommandPool() {
@@ -340,29 +267,6 @@ void VkApp::CreateCommandPool() {
     BOOST_ASSERT_MSG(false, "Failed to create command pool!");
   }
 }
-
-void VkApp::CreateFramebuffers() {
-  framebuffers_.resize(swapchain_.views.size());
-  for (size_t i = 0; i < framebuffers_.size(); i++) {
-    // TODO: DepthStencil対応
-    std::vector<VkImageView> attachments = {swapchain_.views[i],
-                                            /* depthView */};
-    VkFramebufferCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    create.renderPass = renderPass_;
-    create.attachmentCount = static_cast<uint32_t>(attachments.size());
-    create.pAttachments = attachments.data();
-    create.width = swapchain_.extent.width;
-    create.height = swapchain_.extent.height;
-    create.layers = 1;
-    if (vkCreateFramebuffer(instance_.device, &create, nullptr,
-                            &framebuffers_[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to create framebuffer!");
-    }
-  }
-}
-
-void VkApp::CreateVertexBuffer() {}
 
 void VkApp::CreateDrawCommandBuffers() {
   commandBuffers_.draw.resize(framebuffers_.size());
@@ -380,6 +284,14 @@ void VkApp::CreateDrawCommandBuffers() {
   RecordDrawCommands();
 }
 
+void VkApp::CreateSyncObjects() {
+  syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
+}
+
+//*-----------------------------------------------------------------------------
+// Swapchain
+//*-----------------------------------------------------------------------------
+
 void VkApp::RecreateSwapchain() {
   // Windowが最小化されている場合framebufferのresizeが行われるまで待ちます。
   int width = 0;
@@ -394,9 +306,9 @@ void VkApp::RecreateSwapchain() {
 
   CleanupSwapchain();
 
-  swapchain_.Create(instance_, width, height);
+  CreateSwapchain(width, height);
   CreateRenderPass();
-  pipelines_.Create(instance_, swapchain_, renderPass_, config_["Pipelines"]);
+  CreatePipelines();
   CreateFramebuffers();
   CreateDrawCommandBuffers();
 }
@@ -501,54 +413,4 @@ float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
 #endif
 
   return score;
-}
-
-void VkApp::RecordDrawCommands() {
-  for (size_t i = 0; i < commandBuffers_.draw.size(); i++) {
-    VkCommandBufferBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-    begin.pInheritanceInfo = nullptr;
-
-    if (vkBeginCommandBuffer(commandBuffers_.draw[i], &begin)) {
-      BOOST_ASSERT_MSG(false, "Failed to begin recording command buffer!");
-    }
-
-    VkRenderPassBeginInfo render{};
-    render.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render.renderPass = renderPass_;
-    render.framebuffer = framebuffers_[i];
-    render.renderArea.offset = {0, 0};
-    render.renderArea.extent = swapchain_.extent;
-
-    // TODO: DepthStencil対応
-    std::array<VkClearValue, 1> clear{};
-    clear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    render.clearValueCount = static_cast<uint32_t>(clear.size());
-    render.pClearValues = clear.data();
-
-    vkCmdBeginRenderPass(commandBuffers_.draw[i], &render,
-                         VK_SUBPASS_CONTENTS_INLINE);
-    {
-      // TODO: VertexBufferObjectとIndexBufferObjectの対応
-      // TODO: DrawIndexed対応
-      // TODO: 複数のModelとPipelineの対応
-      vkCmdBindPipeline(commandBuffers_.draw[i],
-                        VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
-
-      std::vector<VkBuffer> vertex = {vertexBuffer_.buffer};
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0,
-                             static_cast<uint32_t>(vertex.size()),
-                             vertex.data(), offsets);
-
-      vkCmdDraw(commandBuffers_.draw[i],
-                static_cast<uint32_t>(vertexBuffer_.vertices.size()), 1, 0, 0);
-    }
-    vkCmdEndRenderPass(commandBuffers_.draw[i]);
-
-    if (vkEndCommandBuffer(commandBuffers_.draw[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to record draw command buffer!");
-    }
-  }
 }

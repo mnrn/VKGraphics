@@ -5,8 +5,8 @@
   "Samples" : 0,
   "Pipelines" : [
     {
-      "VertexShader": "./Assets/SPIR-V/Basic/Basic.vs.spv",
-      "FragmentShader": "./Assets/SPIR-V/Basic/Basic.fs.spv"
+      "VertexShader": "./Assets/SPIR-V/Primitives/Triangle.vs.spv",
+      "FragmentShader": "./Assets/SPIR-V/Primitives/Triangle.fs.spv"
     }
   ]
 }
