@@ -1,0 +1,12 @@
+{
+  "AppName" : "Uniform Buffers Test",
+  "Width" : 1280,
+  "Height" : 720,
+  "Samples" : 0,
+  "Pipelines" : [
+    {
+      "VertexShader": "./Assets/SPIR-V/Basic/Basic.vs.spv",
+      "FragmentShader": "./Assets/SPIR-V/Basic/Basic.fs.spv"
+    }
+  ]
+}

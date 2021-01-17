@@ -92,5 +92,6 @@ set(TARGETS
     #ListsLayers
     #LoadValidationLayers
     HelloTriangle
+    UniformBuffers
     )
 buildAll()

@@ -46,6 +46,7 @@ protected:
 
   virtual void CreateRenderPass() = 0;
   virtual void CreatePipelines() = 0;
+  virtual void DestroyPipelines() = 0;
   virtual void CreateFramebuffers() = 0;
   virtual void CreateVertexBuffer() = 0;
   virtual void CreateIndexBuffer() = 0;
@@ -60,7 +61,6 @@ protected:
 
   Instance instance_{};
   Swapchain swapchain_{};
-  Pipelines pipelines_{};
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
   struct CommandBuffers {
     std::vector<VkCommandBuffer> draw;

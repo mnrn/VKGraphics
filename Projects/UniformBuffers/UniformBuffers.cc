@@ -1,4 +1,4 @@
-#include "HelloTriangle.h"
+#include "UniformBuffers.h"
 
 #include <boost/assert.hpp>
 #include <glm/glm.hpp>
@@ -40,13 +40,13 @@ struct Vertex {
 static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
                                           {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
                                           {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-static const std::vector<uint16_t> indices{2, 1, 0};
+static const std::vector<uint16_t> indices{0, 1, 2};
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
 //*-----------------------------------------------------------------------------
 
-void HelloTriangle::CreateRenderPass() {
+void UniformBuffers::CreateRenderPass() {
   VkAttachmentDescription color{};
   color.format = swapchain_.format;
   color.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -91,7 +91,7 @@ void HelloTriangle::CreateRenderPass() {
   }
 }
 
-void HelloTriangle::CreatePipelines() {
+void UniformBuffers::CreatePipelines() {
   {
     VkPipelineLayoutCreateInfo create{};
     create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -234,11 +234,7 @@ void HelloTriangle::CreatePipelines() {
   }
 }
 
-void HelloTriangle::DestroyPipelines() {
-  pipelines_.Destroy(instance_);
-}
-
-void HelloTriangle::CreateFramebuffers() {
+void UniformBuffers::CreateFramebuffers() {
   framebuffers_.resize(swapchain_.views.size());
   for (size_t i = 0; i < framebuffers_.size(); i++) {
     std::vector<VkImageView> attachments = {swapchain_.views[i],
@@ -258,15 +254,15 @@ void HelloTriangle::CreateFramebuffers() {
   }
 }
 
-void HelloTriangle::CreateVertexBuffer() {
+void UniformBuffers::CreateVertexBuffer() {
   vertex_.Create(instance_, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 }
 
-void HelloTriangle::CreateIndexBuffer() {
+void UniformBuffers::CreateIndexBuffer() {
   index_.Create(instance_, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
-void HelloTriangle::CreateDrawCommandBuffers() {
+void UniformBuffers::CreateDrawCommandBuffers() {
   commandBuffers_.draw.resize(framebuffers_.size());
 
   VkCommandBufferAllocateInfo alloc{};

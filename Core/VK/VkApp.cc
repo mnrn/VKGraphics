@@ -306,7 +306,7 @@ void VkApp::CleanupSwapchain() {
   vkFreeCommandBuffers(instance_.device, instance_.pool,
                        static_cast<uint32_t>(commandBuffers_.draw.size()),
                        commandBuffers_.draw.data());
-  pipelines_.Destroy(instance_);
+  DestroyPipelines();
   vkDestroyRenderPass(instance_.device, renderPass_, nullptr);
   swapchain_.Destroy(instance_);
 }
