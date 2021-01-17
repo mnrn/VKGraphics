@@ -48,8 +48,7 @@ protected:
   virtual void CreatePipelines() = 0;
   virtual void CreateFramebuffers() = 0;
   virtual void CreateVertexBuffer() = 0;
-  virtual void CreateDrawCommandBuffers();
-  virtual void RecordDrawCommands() = 0;
+  virtual void CreateDrawCommandBuffers() = 0;
 
   void CreateSyncObjects();
 
@@ -64,8 +63,6 @@ protected:
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
   struct CommandBuffers {
     std::vector<VkCommandBuffer> draw;
-    std::array<VkCommandBuffer, 3> push;
-    size_t currentPush = 0;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
   VertexBuffer vertexBuffer_{};

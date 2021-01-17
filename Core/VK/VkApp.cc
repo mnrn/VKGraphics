@@ -270,19 +270,7 @@ void VkApp::CreateCommandPool() {
 }
 
 void VkApp::CreateDrawCommandBuffers() {
-  commandBuffers_.draw.resize(framebuffers_.size());
 
-  VkCommandBufferAllocateInfo alloc{};
-  alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc.commandPool = instance_.pool;
-  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc.commandBufferCount = static_cast<uint32_t>(commandBuffers_.draw.size());
-  if (vkAllocateCommandBuffers(instance_.device, &alloc,
-                               commandBuffers_.draw.data())) {
-    BOOST_ASSERT_MSG(false, "Failed to alloc draw command buffers!");
-  }
-
-  RecordDrawCommands();
 }
 
 void VkApp::CreateSyncObjects() {

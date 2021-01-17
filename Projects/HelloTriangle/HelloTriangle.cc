@@ -249,7 +249,19 @@ void HelloTriangle::CreateVertexBuffer() {
   vertexBuffer_.Create(instance_, vertices);
 }
 
-void HelloTriangle::RecordDrawCommands() {
+void HelloTriangle::CreateDrawCommandBuffers() {
+  commandBuffers_.draw.resize(framebuffers_.size());
+
+  VkCommandBufferAllocateInfo alloc{};
+  alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc.commandPool = instance_.pool;
+  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc.commandBufferCount = static_cast<uint32_t>(commandBuffers_.draw.size());
+  if (vkAllocateCommandBuffers(instance_.device, &alloc,
+                               commandBuffers_.draw.data())) {
+    BOOST_ASSERT_MSG(false, "Failed to alloc draw command buffers!");
+  }
+
   for (size_t i = 0; i < commandBuffers_.draw.size(); i++) {
     VkCommandBufferBeginInfo begin{};
     begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -280,9 +292,11 @@ void HelloTriangle::RecordDrawCommands() {
       vkCmdBindPipeline(commandBuffers_.draw[i],
                         VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
       VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1, &vertexBuffer_.buffer, offsets);
+      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1,
+                             &vertexBuffer_.buffer, offsets);
 
-      vkCmdDraw(commandBuffers_.draw[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+      vkCmdDraw(commandBuffers_.draw[i], static_cast<uint32_t>(vertices.size()),
+                1, 0, 0);
     }
     vkCmdEndRenderPass(commandBuffers_.draw[i]);
 

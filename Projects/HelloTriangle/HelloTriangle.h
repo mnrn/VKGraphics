@@ -8,5 +8,5 @@ private:
   void CreatePipelines() override;
   void CreateFramebuffers() override;
   void CreateVertexBuffer() override;
-  void RecordDrawCommands() override;
+  void CreateDrawCommandBuffers() override;
 };
