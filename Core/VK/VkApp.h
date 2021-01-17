@@ -48,6 +48,7 @@ protected:
   virtual void CreatePipelines() = 0;
   virtual void CreateFramebuffers() = 0;
   virtual void CreateVertexBuffer() = 0;
+  virtual void CreateIndexBuffer() = 0;
   virtual void CreateDrawCommandBuffers() = 0;
 
   void CreateSyncObjects();
@@ -66,6 +67,7 @@ protected:
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
   BufferObject vertex_{};
+  BufferObject index_{};
   SyncObjects syncs_{};
 
   GLFWwindow *window_ = nullptr;

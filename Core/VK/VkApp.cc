@@ -40,13 +40,17 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreatePipelines();
   CreateFramebuffers();
   CreateVertexBuffer();
+  CreateIndexBuffer();
   CreateDrawCommandBuffers();
   CreateSyncObjects();
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
+
+  index_.Destroy(instance_);
   vertex_.Destroy(instance_);
+
   syncs_.Destroy(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)
@@ -121,7 +125,6 @@ void VkApp::OnRender() {
 
   syncs_.currentFrame = (id + 1) % kMaxFramesInFlight;
 }
-
 
 void VkApp::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
 
@@ -265,9 +268,7 @@ void VkApp::CreateCommandPool() {
   }
 }
 
-void VkApp::CreateDrawCommandBuffers() {
-
-}
+void VkApp::CreateDrawCommandBuffers() {}
 
 void VkApp::CreateSyncObjects() {
   syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);

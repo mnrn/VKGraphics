@@ -40,13 +40,13 @@ struct Vertex {
 static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
                                           {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
                                           {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-static const std::vector<uint16_t> indices{0, 1, 2, 2, 3};
+static const std::vector<uint16_t> indices{0, 1, 2};
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
 //*-----------------------------------------------------------------------------
 
-void HelloTriangle::CreateRenderPass() {
+void UniformBuffer::CreateRenderPass() {
   VkAttachmentDescription color{};
   color.format = swapchain_.format;
   color.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -91,7 +91,7 @@ void HelloTriangle::CreateRenderPass() {
   }
 }
 
-void HelloTriangle::CreatePipelines() {
+void UniformBuffer::CreatePipelines() {
   {
     VkPipelineLayoutCreateInfo create{};
     create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -234,7 +234,7 @@ void HelloTriangle::CreatePipelines() {
   }
 }
 
-void HelloTriangle::CreateFramebuffers() {
+void UniformBuffer::CreateFramebuffers() {
   framebuffers_.resize(swapchain_.views.size());
   for (size_t i = 0; i < framebuffers_.size(); i++) {
     std::vector<VkImageView> attachments = {swapchain_.views[i],
@@ -254,11 +254,15 @@ void HelloTriangle::CreateFramebuffers() {
   }
 }
 
-void HelloTriangle::CreateVertexBuffer() {
-  vertex_.Create(instance_, vertices);
+void UniformBuffer::CreateVertexBuffer() {
+  vertex_.Create(instance_, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 }
 
-void HelloTriangle::CreateDrawCommandBuffers() {
+void UniformBuffer::CreateIndexBuffer() {
+  index_.Create(instance_, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+}
+
+void UniformBuffer::CreateDrawCommandBuffers() {
   commandBuffers_.draw.resize(framebuffers_.size());
 
   VkCommandBufferAllocateInfo alloc{};
@@ -296,16 +300,16 @@ void HelloTriangle::CreateDrawCommandBuffers() {
     vkCmdBeginRenderPass(commandBuffers_.draw[i], &render,
                          VK_SUBPASS_CONTENTS_INLINE);
     {
-      // TODO: VertexBufferとIndexBufferの対応
-      // TODO: DrawIndexed対応
       vkCmdBindPipeline(commandBuffers_.draw[i],
                         VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
       VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1,
-                             &vertex_.buffer, offsets);
+      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1, &vertex_.buffer,
+                             offsets);
+      vkCmdBindIndexBuffer(commandBuffers_.draw[i], index_.buffer, 0,
+                           VK_INDEX_TYPE_UINT16);
 
-      vkCmdDraw(commandBuffers_.draw[i], static_cast<uint32_t>(vertices.size()),
-                1, 0, 0);
+      vkCmdDrawIndexed(commandBuffers_.draw[i],
+                       static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
     }
     vkCmdEndRenderPass(commandBuffers_.draw[i]);
 

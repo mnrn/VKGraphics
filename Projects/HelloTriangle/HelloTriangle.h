@@ -2,11 +2,12 @@
 
 #include "VK/VkApp.h"
 
-class HelloTriangle : public VkApp {
+class UniformBuffer : public VkApp {
 private:
   void CreateRenderPass() override;
   void CreatePipelines() override;
   void CreateFramebuffers() override;
   void CreateVertexBuffer() override;
+  void CreateIndexBuffer() override;
   void CreateDrawCommandBuffers() override;
 };
