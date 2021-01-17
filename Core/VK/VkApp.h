@@ -13,10 +13,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "VK/Buffer/BufferObject.h"
+#include "VK/Buffer/Buffer.h"
 #include "VK/Debug.h"
 #include "VK/Instance.h"
-#include "VK/Pipeline/Pipelines.h"
 #include "VK/Swapchain.h"
 #include "VK/Sync/SyncObjects.h"
 
@@ -62,19 +61,20 @@ protected:
 
   virtual void CleanupSwapchain();
   virtual void RecreateSwapchain();
+  virtual void UpdateUniformBuffers(uint32_t imageIndex);
 
   static constexpr size_t kMaxFramesInFlight = 2;
 
   Instance instance_{};
   Swapchain swapchain_{};
-  VkDescriptorPool descPool_ = VK_NULL_HANDLE;
+  VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
   struct CommandBuffers {
     std::vector<VkCommandBuffer> draw;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
-  BufferObject vertex_{};
-  BufferObject index_{};
+  Buffer vertex_{};
+  Buffer index_{};
   SyncObjects syncs_{};
 
   GLFWwindow *window_ = nullptr;

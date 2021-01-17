@@ -9,7 +9,7 @@
 #include "UniformBuffers.h"
 
 int main() {
-  const auto config = JSON::Parse("./Projects/HelloTriangle/Config.json");
+  const auto config = JSON::Parse("./Projects/UniformBuffers/Config.json");
   BOOST_ASSERT_MSG(config, "Failed to open Config.json!");
 
   App app(config.value());

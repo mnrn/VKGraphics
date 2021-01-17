@@ -9,7 +9,7 @@
 
 struct Instance;
 
-struct DescriptorSets {
+struct Descriptors {
 public:
   void Destroy(const Instance &instance);
   const VkDescriptorSet &operator[](size_t) const;

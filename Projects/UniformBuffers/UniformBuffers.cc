@@ -2,6 +2,8 @@
 
 #include <boost/assert.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 
 #include "VK/Pipeline/Shader.h"
@@ -37,14 +39,33 @@ struct Vertex {
   }
 };
 
-static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                          {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-                                          {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-static const std::vector<uint16_t> indices{0, 1, 2};
+struct UniformBufferObject {
+  alignas(16) glm::mat4 model;
+  alignas(16) glm::mat4 view;
+  alignas(16) glm::mat4 proj;
+};
+
+static const std::vector<Vertex> vertices{{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                          {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                                          {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                                          {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+static const std::vector<uint16_t> indices{0, 1, 2, 2, 3, 0};
+
+static constexpr float kRotSpeed = glm::quarter_pi<float>();
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
 //*-----------------------------------------------------------------------------
+
+void UniformBuffers::OnUpdate(float t) {
+  const float deltaT = tPrev_ == 0.0f ? 0.0f : t - tPrev_;
+  tPrev_ = t;
+
+  angle_ += kRotSpeed * deltaT;
+  if (angle_ > glm::two_pi<float>()) {
+    angle_ -= glm::two_pi<float>();
+  }
+}
 
 void UniformBuffers::CreateRenderPass() {
   VkAttachmentDescription color{};
@@ -91,11 +112,40 @@ void UniformBuffers::CreateRenderPass() {
   }
 }
 
+void UniformBuffers::CreateDescriptorSetLayouts() {
+  if (descriptors_.layout != VK_NULL_HANDLE) {
+    return;
+  }
+
+  VkDescriptorSetLayoutBinding ubo{};
+  ubo.binding = 0;
+  ubo.descriptorCount = 1;
+  ubo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  ubo.pImmutableSamplers = nullptr;
+  ubo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  std::vector<VkDescriptorSetLayoutBinding> binds{ubo};
+  VkDescriptorSetLayoutCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  create.bindingCount = static_cast<uint32_t>(binds.size());
+  create.pBindings = binds.data();
+
+  if (vkCreateDescriptorSetLayout(instance_.device, &create, nullptr,
+                                  &descriptors_.layout)) {
+    BOOST_ASSERT_MSG(false, "Failed to create descriptor set layout!");
+  }
+}
+
+void UniformBuffers::DestroyDescriptorSetLayouts() {
+  vkDestroyDescriptorSetLayout(instance_.device, descriptors_.layout, nullptr);
+}
+
 void UniformBuffers::CreatePipelines() {
   {
     VkPipelineLayoutCreateInfo create{};
     create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create.setLayoutCount = 0;
+    create.setLayoutCount = 1;
+    create.pSetLayouts = &descriptors_.layout;
     if (vkCreatePipelineLayout(instance_.device, &create, nullptr,
                                &pipelines_.layout)) {
       BOOST_ASSERT_MSG(false, "Failed to create pipeline layout");
@@ -234,6 +284,8 @@ void UniformBuffers::CreatePipelines() {
   }
 }
 
+void UniformBuffers::DestroyPipelines() { pipelines_.Destroy(instance_); }
+
 void UniformBuffers::CreateFramebuffers() {
   framebuffers_.resize(swapchain_.views.size());
   for (size_t i = 0; i < framebuffers_.size(); i++) {
@@ -307,6 +359,9 @@ void UniformBuffers::CreateDrawCommandBuffers() {
                              offsets);
       vkCmdBindIndexBuffer(commandBuffers_.draw[i], index_.buffer, 0,
                            VK_INDEX_TYPE_UINT16);
+      vkCmdBindDescriptorSets(
+          commandBuffers_.draw[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+          pipelines_.layout, 0, 1, &descriptors_[i], 0, nullptr);
 
       vkCmdDrawIndexed(commandBuffers_.draw[i],
                        static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
@@ -316,5 +371,93 @@ void UniformBuffers::CreateDrawCommandBuffers() {
     if (vkEndCommandBuffer(commandBuffers_.draw[i])) {
       BOOST_ASSERT_MSG(false, "Failed to record draw command buffer!");
     }
+  }
+}
+
+void UniformBuffers::CreateUniformBuffers() {
+  VkDeviceSize size = sizeof(UniformBufferObject);
+  uniforms_.resize(swapchain_.images.size());
+
+  for (size_t i = 0; i < swapchain_.images.size(); i++) {
+    Buffer::Create(instance_, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                   uniforms_[i].buffer, uniforms_[i].memory);
+  }
+}
+
+void UniformBuffers::DestroyUniformBuffers() {
+  for (size_t i = 0; i < swapchain_.images.size(); i++) {
+    uniforms_[i].Destroy(instance_);
+  }
+}
+
+void UniformBuffers::UpdateUniformBuffers(uint32_t imageIndex) {
+  UniformBufferObject ubo;
+  ubo.model = glm::rotate(glm::mat4(1.0f), angle_, glm::vec3(0.0f, 0.0f, 1.0f));
+  ubo.view =
+      glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+                  glm::vec3(0.0f, 0.0f, 1.0f));
+  ubo.proj = glm::perspective(glm::radians(45.0f),
+                              static_cast<float>(swapchain_.extent.width) /
+                                  static_cast<float>(swapchain_.extent.height),
+                              0.1f, 10.0f);
+  ubo.proj[1][1] *= -1;
+
+  void *data;
+  vkMapMemory(instance_.device, uniforms_[imageIndex].memory, 0, sizeof(ubo), 0,
+              &data);
+  std::memcpy(data, &ubo, sizeof(ubo));
+  vkUnmapMemory(instance_.device, uniforms_[imageIndex].memory);
+}
+
+void UniformBuffers::CreateDescriptorPool() {
+  VkDescriptorPoolSize size{};
+  size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  size.descriptorCount = static_cast<uint32_t>(swapchain_.images.size());
+
+  VkDescriptorPoolCreateInfo create{};
+  create.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  create.poolSizeCount = 1;
+  create.pPoolSizes = &size;
+  create.maxSets = static_cast<uint32_t>(swapchain_.images.size());
+
+  if (vkCreateDescriptorPool(instance_.device, &create, nullptr,
+                             &descriptorPool_)) {
+    BOOST_ASSERT_MSG(false, "Failed to create descriptor pool!");
+  }
+}
+
+void UniformBuffers::CreateDescriptorSets() {
+  std::vector<VkDescriptorSetLayout> layouts(swapchain_.images.size(),
+                                             descriptors_.layout);
+  VkDescriptorSetAllocateInfo alloc{};
+  alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  alloc.descriptorPool = descriptorPool_;
+  alloc.descriptorSetCount = static_cast<uint32_t>(swapchain_.images.size());
+  alloc.pSetLayouts = layouts.data();
+
+  descriptors_.handles.resize(swapchain_.images.size());
+  if (vkAllocateDescriptorSets(instance_.device, &alloc,
+                               descriptors_.handles.data())) {
+    BOOST_ASSERT_MSG(false, "Failed to allocate descriptor sets!");
+  }
+
+  for (size_t i = 0; i < swapchain_.images.size(); i++) {
+    VkDescriptorBufferInfo info{};
+    info.buffer = uniforms_[i].buffer;
+    info.offset = 0;
+    info.range = sizeof(UniformBufferObject);
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descriptors_[i];
+    write.dstBinding = 0;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &info;
+
+    vkUpdateDescriptorSets(instance_.device, 1, &write, 0, nullptr);
   }
 }

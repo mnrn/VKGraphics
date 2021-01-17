@@ -86,7 +86,7 @@ function(buildAll)
     endforeach (TARGET)
 endfunction(buildAll)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
+#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
 set(TARGETS
     #MinimalVK
     #ListsLayers

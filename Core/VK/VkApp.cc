@@ -82,6 +82,9 @@ void VkApp::OnRender() {
     BOOST_ASSERT_MSG(false, "Failed to acquire swap chain image!");
   }
 
+  // このタイミングでUniformBufferObjectsの更新を行います。
+  UpdateUniformBuffers(image);
+
   if (syncs_.fences.imagesInFlight[image] != VK_NULL_HANDLE) {
     vkWaitForFences(instance_.device, 1, &syncs_.fences.imagesInFlight[image],
                     VK_TRUE, std::numeric_limits<uint64_t>::max());
@@ -302,6 +305,7 @@ void VkApp::RecreateSwapchain() {
   CreateRenderPass();
   CreatePipelines();
   CreateFramebuffers();
+  CreateUniformBuffers();
   CreateDescriptorPool();
   CreateDescriptorSets();
   CreateDrawCommandBuffers();
@@ -320,8 +324,14 @@ void VkApp::CleanupSwapchain() {
   swapchain_.Destroy(instance_);
 
   DestroyUniformBuffers();
-  vkDestroyDescriptorPool(instance_.device, descPool_, nullptr);
+  vkDestroyDescriptorPool(instance_.device, descriptorPool_, nullptr);
 }
+
+//*-----------------------------------------------------------------------------
+// Update
+//*-----------------------------------------------------------------------------
+
+void VkApp::UpdateUniformBuffers(uint32_t) {}
 
 //*-----------------------------------------------------------------------------
 // Subroutine

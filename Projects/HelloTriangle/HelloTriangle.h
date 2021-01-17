@@ -2,6 +2,8 @@
 
 #include "VK/VkApp.h"
 
+#include "VK/Pipeline/Pipelines.h"
+
 class HelloTriangle : public VkApp {
 private:
   void CreateRenderPass() override;

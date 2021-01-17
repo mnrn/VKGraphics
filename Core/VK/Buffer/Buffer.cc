@@ -6,10 +6,9 @@
 #include "VK/Buffer/Memory.h"
 #include "VK/Instance.h"
 
-namespace Buffer {
-void Create(const Instance &instance, VkDeviceSize size,
-            VkBufferUsageFlags usage, VkMemoryPropertyFlags memProp,
-            VkBuffer &buffer, VkDeviceMemory &memory) {
+void Buffer::Create(const Instance &instance, VkDeviceSize size,
+                    VkBufferUsageFlags usage, VkMemoryPropertyFlags memProp,
+                    VkBuffer &buffer, VkDeviceMemory &memory) {
   VkBufferCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   create.size = size;
@@ -38,8 +37,8 @@ void Create(const Instance &instance, VkDeviceSize size,
   vkBindBufferMemory(instance.device, buffer, memory, 0);
 }
 
-void Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
-          VkDeviceSize size) {
+void Buffer::Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
+                  VkDeviceSize size) {
   VkCommandBuffer command = Command::BeginSingleTime(instance);
 
   VkBufferCopy copy{};
@@ -47,4 +46,12 @@ void Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
   vkCmdCopyBuffer(command, src, dst, 1, &copy);
   Command::EndSingleTime(instance, command);
 }
-} // namespace Buffer
+
+void Buffer::Destroy(const Instance &instance) const {
+  if (buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(instance.device, buffer, nullptr);
+  }
+  if (memory != VK_NULL_HANDLE) {
+    vkFreeMemory(instance.device, memory, nullptr);
+  }
+}
