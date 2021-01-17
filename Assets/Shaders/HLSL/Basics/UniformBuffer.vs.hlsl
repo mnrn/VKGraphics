@@ -2,6 +2,7 @@ struct VSInput {
     [[vk::location(0)]] float2 pos : POSITION0;
     [[vk::location(1)]] float3 color : COLOR0;
 };
+
 struct UniformBufferObject {
     float4x4 model;
     float4x4 view;
