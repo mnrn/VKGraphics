@@ -6,6 +6,10 @@
 
 #include "VK/Pipeline/Shader.h"
 
+//*-----------------------------------------------------------------------------
+// Constant expressions
+//*-----------------------------------------------------------------------------
+
 struct Vertex {
   glm::vec2 pos;
   glm::vec3 color;
@@ -36,6 +40,11 @@ struct Vertex {
 static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
                                           {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
                                           {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+static const std::vector<uint16_t> indices{0, 1, 2, 2, 3};
+
+//*-----------------------------------------------------------------------------
+// Overrides functions
+//*-----------------------------------------------------------------------------
 
 void HelloTriangle::CreateRenderPass() {
   VkAttachmentDescription color{};
@@ -246,7 +255,7 @@ void HelloTriangle::CreateFramebuffers() {
 }
 
 void HelloTriangle::CreateVertexBuffer() {
-  vertexBuffer_.Create(instance_, vertices);
+  vertex_.Create(instance_, vertices);
 }
 
 void HelloTriangle::CreateDrawCommandBuffers() {
@@ -293,7 +302,7 @@ void HelloTriangle::CreateDrawCommandBuffers() {
                         VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
       VkDeviceSize offsets[] = {0};
       vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1,
-                             &vertexBuffer_.buffer, offsets);
+                             &vertex_.buffer, offsets);
 
       vkCmdDraw(commandBuffers_.draw[i], static_cast<uint32_t>(vertices.size()),
                 1, 0, 0);

@@ -1,10 +1,10 @@
-#include "VK/Buffer/VertexBuffer.h"
+#include "VK/Buffer/BufferObject.h"
 
 //*-----------------------------------------------------------------------------
 // Create & Destroy
 //*-----------------------------------------------------------------------------
 
-void VertexBuffer::Destroy(const Instance &instance) const {
+void BufferObject::Destroy(const Instance &instance) const {
   if (buffer != VK_NULL_HANDLE) {
     vkDestroyBuffer(instance.device, buffer, nullptr);
   }

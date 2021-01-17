@@ -16,10 +16,6 @@
 #include "VK/Pipeline/Shader.h"
 
 //*-----------------------------------------------------------------------------
-// Constant expressions
-//*-----------------------------------------------------------------------------
-
-//*-----------------------------------------------------------------------------
 // Init & Deinit
 //*-----------------------------------------------------------------------------
 
@@ -50,7 +46,7 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
-  vertexBuffer_.Destroy(instance_);
+  vertex_.Destroy(instance_);
   syncs_.Destroy(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);
 #if !defined(NDEBUG)

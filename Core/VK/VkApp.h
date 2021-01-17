@@ -13,7 +13,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "VK/Buffer/VertexBuffer.h"
+#include "VK/Buffer/BufferObject.h"
 #include "VK/Debug.h"
 #include "VK/Instance.h"
 #include "VK/Pipeline/Pipelines.h"
@@ -65,7 +65,7 @@ protected:
     std::vector<VkCommandBuffer> draw;
   } commandBuffers_{};
   std::vector<VkFramebuffer> framebuffers_{};
-  VertexBuffer vertexBuffer_{};
+  BufferObject vertex_{};
   SyncObjects syncs_{};
 
   GLFWwindow *window_ = nullptr;
