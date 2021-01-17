@@ -40,7 +40,7 @@ struct Vertex {
 static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
                                           {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
                                           {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-static const std::vector<uint16_t> indices{0, 1, 2};
+static const std::vector<uint16_t> indices{2, 1, 0};
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
