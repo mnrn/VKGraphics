@@ -37,16 +37,22 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreateSwapchain(width, height);
   CreateCommandPool();
   CreateRenderPass();
+  CreateDescriptorSetLayouts();
   CreatePipelines();
   CreateFramebuffers();
   CreateVertexBuffer();
   CreateIndexBuffer();
+  CreateUniformBuffers();
+  CreateDescriptorPool();
+  CreateDescriptorSets();
   CreateDrawCommandBuffers();
   CreateSyncObjects();
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
+
+  DestroyDescriptorSetLayouts();
 
   index_.Destroy(instance_);
   vertex_.Destroy(instance_);
@@ -296,6 +302,8 @@ void VkApp::RecreateSwapchain() {
   CreateRenderPass();
   CreatePipelines();
   CreateFramebuffers();
+  CreateDescriptorPool();
+  CreateDescriptorSets();
   CreateDrawCommandBuffers();
 }
 
@@ -308,7 +316,11 @@ void VkApp::CleanupSwapchain() {
                        commandBuffers_.draw.data());
   DestroyPipelines();
   vkDestroyRenderPass(instance_.device, renderPass_, nullptr);
+
   swapchain_.Destroy(instance_);
+
+  DestroyUniformBuffers();
+  vkDestroyDescriptorPool(instance_.device, descPool_, nullptr);
 }
 
 //*-----------------------------------------------------------------------------

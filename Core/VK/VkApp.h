@@ -45,11 +45,17 @@ protected:
   void CreateCommandPool();
 
   virtual void CreateRenderPass() = 0;
+  virtual void CreateDescriptorSetLayouts() = 0;
+  virtual void DestroyDescriptorSetLayouts() = 0;
   virtual void CreatePipelines() = 0;
   virtual void DestroyPipelines() = 0;
   virtual void CreateFramebuffers() = 0;
   virtual void CreateVertexBuffer() = 0;
   virtual void CreateIndexBuffer() = 0;
+  virtual void CreateUniformBuffers() = 0;
+  virtual void DestroyUniformBuffers() = 0;
+  virtual void CreateDescriptorPool() = 0;
+  virtual void CreateDescriptorSets() = 0;
   virtual void CreateDrawCommandBuffers() = 0;
 
   void CreateSyncObjects();
@@ -61,6 +67,7 @@ protected:
 
   Instance instance_{};
   Swapchain swapchain_{};
+  VkDescriptorPool descPool_ = VK_NULL_HANDLE;
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
   struct CommandBuffers {
     std::vector<VkCommandBuffer> draw;

@@ -9,11 +9,11 @@
 
 struct Instance;
 
-struct Pipelines {
+struct DescriptorSets {
 public:
   void Destroy(const Instance &instance);
-  const VkPipeline &operator[](size_t) const;
+  const VkDescriptorSet &operator[](size_t) const;
 
-  VkPipelineLayout layout = VK_NULL_HANDLE;
-  std::vector<VkPipeline> handles;
+  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+  std::vector<VkDescriptorSet> handles;
 };
