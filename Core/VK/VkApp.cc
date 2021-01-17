@@ -43,12 +43,14 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreateRenderPass();
   CreatePipelines();
   CreateFramebuffers();
+  CreateVertexBuffer();
   CreateDrawCommandBuffers();
   CreateSyncObjects();
 }
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
+  vertexBuffer_.Destroy(instance_);
   pipelines_.Destroy(instance_);
   syncs_.Destroy(instance_, kMaxFramesInFlight);
   vkDestroyCommandPool(instance_.device, instance_.pool, nullptr);

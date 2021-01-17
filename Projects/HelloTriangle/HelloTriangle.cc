@@ -2,13 +2,40 @@
 
 #include <boost/assert.hpp>
 #include <glm/glm.hpp>
+#include <vector>
 
 #include "VK/Pipeline/Shader.h"
 
 struct Vertex {
   glm::vec2 pos;
   glm::vec3 color;
+
+  static VkVertexInputBindingDescription Bindings() {
+    VkVertexInputBindingDescription bind;
+    bind.binding = 0;
+    bind.stride = sizeof(Vertex);
+    bind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    return bind;
+  }
+
+  static std::array<VkVertexInputAttributeDescription, 2> Attributes() {
+    std::array<VkVertexInputAttributeDescription, 2> attr{};
+    attr[0].binding = 0;
+    attr[0].location = 0;
+    attr[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attr[0].offset = offsetof(Vertex, pos);
+    attr[1].binding = 0;
+    attr[1].location = 1;
+    attr[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attr[1].offset = offsetof(Vertex, color);
+
+    return attr;
+  }
 };
+
+static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                          {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+                                          {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
 
 void HelloTriangle::CreateRenderPass() {
   VkAttachmentDescription color{};
@@ -79,11 +106,14 @@ void HelloTriangle::CreatePipelines() {
                      modules, stages);
     }
 
-    // TODO: VertexInput対応
+    auto binds = Vertex::Bindings();
+    auto attrs = Vertex::Attributes();
     VkPipelineVertexInputStateCreateInfo vi{};
     vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vi.vertexBindingDescriptionCount = 0;
-    vi.vertexAttributeDescriptionCount = 0;
+    vi.vertexBindingDescriptionCount = 1;
+    vi.pVertexBindingDescriptions = &binds;
+    vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+    vi.pVertexAttributeDescriptions = attrs.data();
 
     VkPipelineInputAssemblyStateCreateInfo as{};
     as.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -215,6 +245,10 @@ void HelloTriangle::CreateFramebuffers() {
   }
 }
 
+void HelloTriangle::CreateVertexBuffer() {
+  vertexBuffer_.Create(instance_, vertices);
+}
+
 void HelloTriangle::RecordDrawCommands() {
   for (size_t i = 0; i < commandBuffers_.draw.size(); i++) {
     VkCommandBufferBeginInfo begin{};
@@ -245,8 +279,10 @@ void HelloTriangle::RecordDrawCommands() {
       // TODO: DrawIndexed対応
       vkCmdBindPipeline(commandBuffers_.draw[i],
                         VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
-      // とりあえず現時点では三角形ポリゴンを描画するだけ。
-      vkCmdDraw(commandBuffers_.draw[i], 3, 1, 0, 0);
+      VkDeviceSize offsets[] = {0};
+      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1, &vertexBuffer_.buffer, offsets);
+
+      vkCmdDraw(commandBuffers_.draw[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
     }
     vkCmdEndRenderPass(commandBuffers_.draw[i]);
 

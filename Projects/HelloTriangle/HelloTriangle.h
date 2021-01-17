@@ -7,5 +7,6 @@ private:
   void CreateRenderPass() override;
   void CreatePipelines() override;
   void CreateFramebuffers() override;
+  void CreateVertexBuffer() override;
   void RecordDrawCommands() override;
 };
