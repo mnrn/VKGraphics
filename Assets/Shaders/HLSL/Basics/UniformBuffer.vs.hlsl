@@ -1,18 +1,25 @@
-#version 450
-#extension GL_ARB_separate_shader_objects : enable
+struct VSInput {
+    [[vk::location(0)]] float2 pos : POSITION0;
+    [[vk::location(1)]] float3 color : COLOR0;
+};
+struct UniformBufferObject {
+    float4x4 model;
+    float4x4 view;
+    float4x4 proj;
+};
 
-layout (binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-} ubo;
+cbuffer ubo : register(b0) { 
+    UniformBufferObject ubo; 
+}
 
-layout (location = 0) in vec2 VertexPosition;
-layout (location = 1) in vec3 VertexColor;
+struct VSOutput {
+    float4 pos : SV_POSITION;
+    [[vk::location(0)]] float3 color : COLOR0;
+};
 
-layout (location = 0) out vec3 Color;
-
-void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(VertexPosition, 0.0, 1.0);
-    Color = VertexColor;
+VSOutput main(VSInput i) {
+    VSOutput o = (VSOutput)0;
+    o.pos = mul(ubo.proj, mul(ubo.view, mul(ubo.model, float4(i.pos, 0.0, 1.0))));
+    o.color = i.color;
+    return o;
 }

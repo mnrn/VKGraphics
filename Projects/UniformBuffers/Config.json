@@ -5,8 +5,8 @@
   "Samples" : 0,
   "Pipelines" : [
     {
-      "VertexShader": "./Assets/SPIR-V/Basics/UniformBuffer.vs.spv",
-      "FragmentShader": "./Assets/SPIR-V/Basics/UniformBuffer.fs.spv"
+      "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Basics/UniformBuffer.vs.spv",
+      "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Basics/Basic.fs.spv"
     }
   ]
 }
