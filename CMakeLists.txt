@@ -93,5 +93,6 @@ set(TARGETS
     #LoadValidationLayers
     HelloTriangle
     UniformBuffers
+    TextureMapping
     )
 buildAll()

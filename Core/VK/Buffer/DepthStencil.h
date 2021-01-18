@@ -8,7 +8,9 @@ struct Instance;
 struct Swapchain;
 
 struct DepthStencil {
-  static std::optional<VkFormat> FindDepthFormat(VkPhysicalDevice physicalDevice);
+  static std::optional<VkFormat>
+  FindDepthFormat(VkPhysicalDevice physicalDevice);
+  static bool HasStencilComponent(VkFormat format);
 
   void Create(const Instance &, const Swapchain &);
 
