@@ -22,7 +22,8 @@ FindSupportedFormat(const std::vector<VkFormat> &candicates,
   return std::nullopt;
 }
 
-std::optional<VkFormat> DepthStencil::FindDepthFormat(VkPhysicalDevice physicalDevice) {
+std::optional<VkFormat>
+DepthStencil::FindDepthFormat(VkPhysicalDevice physicalDevice) {
   return FindSupportedFormat(
       {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
        VK_FORMAT_D24_UNORM_S8_UINT},
@@ -30,6 +31,9 @@ std::optional<VkFormat> DepthStencil::FindDepthFormat(VkPhysicalDevice physicalD
       physicalDevice);
 }
 
-void DepthStencil::Create(const Instance &,
-                          const Swapchain &) {
+bool DepthStencil::HasStencilComponent(VkFormat format) {
+  return format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+         format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
+
+void DepthStencil::Create(const Instance &, const Swapchain &) {}

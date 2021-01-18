@@ -47,6 +47,26 @@ void Buffer::Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
   Command::EndSingleTime(instance, command);
 }
 
+void Buffer::CopyToImage(const Instance &instance, VkBuffer buffer,
+                         VkImage image, uint32_t width, uint32_t height) {
+  VkCommandBuffer command = Command::BeginSingleTime(instance);
+
+  VkBufferImageCopy copy{};
+  copy.bufferOffset = 0;
+  copy.bufferRowLength = 0;
+  copy.bufferImageHeight = 0;
+  copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  copy.imageSubresource.mipLevel = 0;
+  copy.imageSubresource.baseArrayLayer = 0;
+  copy.imageSubresource.layerCount = 1;
+  copy.imageOffset = {0, 0, 0};
+  copy.imageExtent = { width, height, 1};
+
+  vkCmdCopyBufferToImage(command, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+  Command::EndSingleTime(instance, command);
+}
+
 void Buffer::Destroy(const Instance &instance) const {
   if (buffer != VK_NULL_HANDLE) {
     vkDestroyBuffer(instance.device, buffer, nullptr);

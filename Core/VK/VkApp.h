@@ -49,6 +49,8 @@ protected:
   virtual void CreatePipelines() = 0;
   virtual void DestroyPipelines() = 0;
   virtual void CreateFramebuffers() = 0;
+  virtual void CreateTextures() {}
+  virtual void DestroyTextures() {}
   virtual void CreateVertexBuffer() = 0;
   virtual void CreateIndexBuffer() = 0;
   virtual void CreateUniformBuffers() = 0;
@@ -61,7 +63,9 @@ protected:
 
   virtual void CleanupSwapchain();
   virtual void RecreateSwapchain();
-  virtual void UpdateUniformBuffers(uint32_t imageIndex);
+  virtual void UpdateUniformBuffers(uint32_t currentImage) {
+    static_cast<void>(currentImage);
+  }
 
   static constexpr size_t kMaxFramesInFlight = 2;
 

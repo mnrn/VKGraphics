@@ -40,6 +40,7 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreateDescriptorSetLayouts();
   CreatePipelines();
   CreateFramebuffers();
+  CreateTextures();
   CreateVertexBuffer();
   CreateIndexBuffer();
   CreateUniformBuffers();
@@ -51,6 +52,8 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
 
 void VkApp::OnDestroy() {
   CleanupSwapchain();
+
+  DestroyTextures();
 
   DestroyDescriptorSetLayouts();
 
@@ -326,12 +329,6 @@ void VkApp::CleanupSwapchain() {
   DestroyUniformBuffers();
   vkDestroyDescriptorPool(instance_.device, descriptorPool_, nullptr);
 }
-
-//*-----------------------------------------------------------------------------
-// Update
-//*-----------------------------------------------------------------------------
-
-void VkApp::UpdateUniformBuffers(uint32_t) {}
 
 //*-----------------------------------------------------------------------------
 // Subroutine

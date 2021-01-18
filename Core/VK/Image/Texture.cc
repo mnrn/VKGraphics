@@ -12,6 +12,7 @@
 
 #include "VK/Buffer/Buffer.h"
 #include "VK/Image/Image.h"
+#include "VK/Image/ImageView.h"
 #include "VK/Instance.h"
 #include "VK/Pipeline/Pipelines.h"
 
@@ -26,7 +27,7 @@ static stbi_uc *Load(const std::string &path, int &w, int &h,
 static void Free(unsigned char *data) { stbi_image_free(data); }
 } // namespace Pixels
 
-void Texture::Load(const Instance &instance, const std::string &filepath) {
+void Texture::Create(const Instance &instance, const std::string &filepath) {
   int w, h;
   stbi_uc *pixels = Pixels::Load(filepath, w, h);
   if (pixels == nullptr) {
@@ -48,12 +49,31 @@ void Texture::Load(const Instance &instance, const std::string &filepath) {
   vkUnmapMemory(instance.device, stagingMemory);
 
   Pixels::Free(pixels);
+
+  Image::Create(instance, w, h, 0, VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
+
+  Image::TransitionImageLayout(instance, image, VK_FORMAT_R8G8B8A8_UNORM,
+                               VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  Buffer::CopyToImage(instance, staging, image, w, h);
+  Image::TransitionImageLayout(instance, image, VK_FORMAT_R8G8B8A8_UNORM,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  vkDestroyBuffer(instance.device, staging, nullptr);
+  vkFreeMemory(instance.device, stagingMemory, nullptr);
+
+  view = ImageView::Create(instance, image, VK_IMAGE_VIEW_TYPE_2D,
+                           VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
-void Texture::CreateDescriptorSet(const Instance &, const Pipelines &) {
-}
-
-void Texture::Cleanup(const Instance& instance) const {
+void Texture::Destroy(const Instance &instance) const {
+  if (sampler) {
+    vkDestroySampler(instance.device, sampler, nullptr);
+  }
   vkDestroyImageView(instance.device, view, nullptr);
   vkDestroyImage(instance.device, image, nullptr);
   vkFreeMemory(instance.device, memory, nullptr);

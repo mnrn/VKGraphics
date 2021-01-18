@@ -13,6 +13,8 @@ struct Buffer {
 
   static void Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
                    VkDeviceSize size);
+  static void CopyToImage(const Instance &instance, VkBuffer buffer,
+                          VkImage image, uint32_t width, uint32_t height);
 
   template <typename T>
   void Create(const Instance &instance, const std::vector<T> &src,
