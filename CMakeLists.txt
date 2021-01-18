@@ -94,5 +94,6 @@ set(TARGETS
     HelloTriangle
     UniformBuffers
     TextureMapping
+    DepthTesting
     )
 buildAll()

@@ -39,6 +39,7 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreateRenderPass();
   CreateDescriptorSetLayouts();
   CreatePipelines();
+  CreateDepthStencil();
   CreateFramebuffers();
   CreateTextures();
   CreateVertexBuffer();
@@ -307,6 +308,7 @@ void VkApp::RecreateSwapchain() {
   CreateSwapchain(width, height);
   CreateRenderPass();
   CreatePipelines();
+  CreateDepthStencil();
   CreateFramebuffers();
   CreateUniformBuffers();
   CreateDescriptorPool();
@@ -315,6 +317,7 @@ void VkApp::RecreateSwapchain() {
 }
 
 void VkApp::CleanupSwapchain() {
+  DestroyDepthStencil();
   for (auto &framebuffer : framebuffers_) {
     vkDestroyFramebuffer(instance_.device, framebuffer, nullptr);
   }

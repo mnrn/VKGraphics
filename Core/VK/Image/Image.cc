@@ -91,7 +91,7 @@ void TransitionImageLayout(const Instance &instance, VkImage image,
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     src = VK_PIPELINE_STAGE_TRANSFER_BIT;
     dst = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (old == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+  } else if (old == VK_IMAGE_LAYOUT_UNDEFINED &&
              flesh == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
     barrier.srcAccessMask = 0;
     barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |

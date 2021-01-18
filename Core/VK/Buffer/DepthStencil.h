@@ -12,7 +12,8 @@ struct DepthStencil {
   FindDepthFormat(VkPhysicalDevice physicalDevice);
   static bool HasStencilComponent(VkFormat format);
 
-  void Create(const Instance &, const Swapchain &);
+  void Create(const Instance &instance, const Swapchain &swapchain);
+  void Destroy(const Instance& instance);
 
   VkImage image = VK_NULL_HANDLE;
   VkDeviceMemory memory = VK_NULL_HANDLE;

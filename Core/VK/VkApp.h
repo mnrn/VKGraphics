@@ -48,6 +48,8 @@ protected:
   virtual void DestroyDescriptorSetLayouts() = 0;
   virtual void CreatePipelines() = 0;
   virtual void DestroyPipelines() = 0;
+  virtual void CreateDepthStencil() {}
+  virtual void DestroyDepthStencil() {}
   virtual void CreateFramebuffers() = 0;
   virtual void CreateTextures() {}
   virtual void DestroyTextures() {}
