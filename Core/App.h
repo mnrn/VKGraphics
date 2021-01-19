@@ -16,7 +16,7 @@
 #include <memory>
 
 #include "Common.h"
-#include "VK/VkApp.h"
+#include "VK/VkBase.h"
 #include "Window.h"
 
 // ********************************************************************************
@@ -44,13 +44,13 @@ public:
     glfwTerminate();
   }
 
-  int Run(std::unique_ptr<VkApp> app) {
+  int Run(std::unique_ptr<VkBase> app) {
     if (window_ == nullptr) {
       return EXIT_FAILURE;
     }
 
     glfwSetWindowUserPointer(window_, app.get());
-    glfwSetFramebufferSizeCallback(window_, VkApp::OnResized);
+    glfwSetFramebufferSizeCallback(window_, VkBase::OnResized);
     app->OnInit(config_, window_);
 
     while (!glfwWindowShouldClose(window_) &&

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "VK/VkApp.h"
+#include "VK/VkBase.h"
 
 #include "VK/Pipeline/Descriptors.h"
 #include "VK/Pipeline/Pipelines.h"
 
-class UniformBuffers : public VkApp {
+class UniformBuffers : public VkBase {
 public:
   void OnUpdate(float t) override;
 

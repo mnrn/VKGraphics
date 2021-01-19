@@ -1,13 +1,13 @@
 #pragma once
 
-#include "VK/VkApp.h"
+#include "VK/VkBase.h"
 
 #include "VK/Buffer/DepthStencil.h"
 #include "VK/Image/Texture.h"
 #include "VK/Pipeline/Descriptors.h"
 #include "VK/Pipeline/Pipelines.h"
 
-class DepthTesting : public VkApp {
+class DepthTesting : public VkBase {
 public:
   void OnUpdate(float t) override;
 

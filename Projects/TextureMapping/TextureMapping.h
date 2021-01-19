@@ -1,12 +1,12 @@
 #pragma once
 
-#include "VK/VkApp.h"
+#include "VK/VkBase.h"
 
 #include "VK/Pipeline/Descriptors.h"
 #include "VK/Pipeline/Pipelines.h"
 #include "VK/Image/Texture.h"
 
-class TextureMapping : public VkApp {
+class TextureMapping : public VkBase {
 public:
   void OnUpdate(float t) override;
 

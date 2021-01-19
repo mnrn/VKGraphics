@@ -19,10 +19,10 @@
 #include "VK/Swapchain.h"
 #include "VK/Sync/SyncObjects.h"
 
-class VkApp : private boost::noncopyable {
+class VkBase : private boost::noncopyable {
 public:
-  VkApp() = default;
-  virtual ~VkApp() = default;
+  VkBase() = default;
+  virtual ~VkBase() = default;
 
   virtual void OnInit(const nlohmann::json &config, GLFWwindow *window);
   virtual void OnDestroy();

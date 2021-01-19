@@ -1,10 +1,10 @@
 #pragma once
 
-#include "VK/VkApp.h"
+#include "VK/VkBase.h"
 
 #include "VK/Pipeline/Pipelines.h"
 
-class HelloTriangle : public VkApp {
+class HelloTriangle : public VkBase {
 private:
   void CreateRenderPass() override;
   void CreateDescriptorSetLayouts() override {}

@@ -6,7 +6,7 @@
 // Including files
 //*-----------------------------------------------------------------------------
 
-#include "VkApp.h"
+#include "VkBase.h"
 #include <vulkan/vulkan.h>
 
 #include <boost/assert.hpp>
@@ -19,7 +19,7 @@
 // Init & Deinit
 //*-----------------------------------------------------------------------------
 
-void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
+void VkBase::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   config_ = config;
   window_ = window;
 
@@ -51,7 +51,7 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreateSyncObjects();
 }
 
-void VkApp::OnDestroy() {
+void VkBase::OnDestroy() {
   CleanupSwapchain();
 
   CleanupAssets();
@@ -69,9 +69,9 @@ void VkApp::OnDestroy() {
   instance_.Destroy();
 }
 
-void VkApp::OnUpdate(float) {}
+void VkBase::OnUpdate(float) {}
 
-void VkApp::OnRender() {
+void VkBase::OnRender() {
   const size_t id = syncs_.currentFrame;
   vkWaitForFences(instance_.device, 1, &syncs_.fences.inFlight[id], VK_TRUE,
                   std::numeric_limits<uint64_t>::max());
@@ -139,10 +139,10 @@ void VkApp::OnRender() {
   syncs_.currentFrame = (id + 1) % kMaxFramesInFlight;
 }
 
-void VkApp::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
+void VkBase::WaitIdle() const { vkDeviceWaitIdle(instance_.device); }
 
-void VkApp::OnResized(GLFWwindow *window, int, int) {
-  auto app = reinterpret_cast<VkApp *>(glfwGetWindowUserPointer(window));
+void VkBase::OnResized(GLFWwindow *window, int, int) {
+  auto app = reinterpret_cast<VkBase *>(glfwGetWindowUserPointer(window));
   app->isFramebufferResized_ = true;
 }
 
@@ -150,7 +150,7 @@ void VkApp::OnResized(GLFWwindow *window, int, int) {
 // Create & Destroy
 //*-----------------------------------------------------------------------------
 
-void VkApp::CreateInstance(const char *appName) {
+void VkBase::CreateInstance(const char *appName) {
   VkApplicationInfo info{};
   info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   info.pApplicationName = appName;
@@ -191,14 +191,14 @@ void VkApp::CreateInstance(const char *appName) {
   }
 }
 
-void VkApp::CreateSurface() {
+void VkBase::CreateSurface() {
   if (glfwCreateWindowSurface(instance_.Get(), window_, nullptr,
                               &instance_.surface)) {
     BOOST_ASSERT_MSG(false, "Failed to create window surface!");
   }
 }
 
-void VkApp::SelectPhysicalDevice() {
+void VkBase::SelectPhysicalDevice() {
   uint32_t size = 0;
   vkEnumeratePhysicalDevices(instance_.Get(), &size, nullptr);
   BOOST_ASSERT_MSG(size != 0, "Failed to find any physical device!");
@@ -220,7 +220,7 @@ void VkApp::SelectPhysicalDevice() {
                                 &instance_.properties);
 }
 
-void VkApp::CreateLogicalDevice() {
+void VkBase::CreateLogicalDevice() {
   QueueFamilies families = QueueFamilies::Find(instance_);
 
   std::vector<VkDeviceQueueCreateInfo> createQueues;
@@ -264,11 +264,11 @@ void VkApp::CreateLogicalDevice() {
                    &instance_.queues.presentation);
 }
 
-void VkApp::CreateSwapchain(int w, int h) {
+void VkBase::CreateSwapchain(int w, int h) {
   swapchain_.Create(instance_, w, h);
 }
 
-void VkApp::CreateCommandPool() {
+void VkBase::CreateCommandPool() {
   QueueFamilies families = QueueFamilies::Find(instance_);
 
   VkCommandPoolCreateInfo create{};
@@ -281,9 +281,9 @@ void VkApp::CreateCommandPool() {
   }
 }
 
-void VkApp::CreateDrawCommandBuffers() {}
+void VkBase::CreateDrawCommandBuffers() {}
 
-void VkApp::CreateSyncObjects() {
+void VkBase::CreateSyncObjects() {
   syncs_.Create(instance_, swapchain_, kMaxFramesInFlight);
 }
 
@@ -291,7 +291,7 @@ void VkApp::CreateSyncObjects() {
 // Swapchain
 //*-----------------------------------------------------------------------------
 
-void VkApp::RecreateSwapchain() {
+void VkBase::RecreateSwapchain() {
   // Windowが最小化されている場合framebufferのresizeが行われるまで待ちます。
   int width = 0;
   int height = 0;
@@ -316,7 +316,7 @@ void VkApp::RecreateSwapchain() {
   CreateDrawCommandBuffers();
 }
 
-void VkApp::CleanupSwapchain() {
+void VkBase::CleanupSwapchain() {
   DestroyDepthStencil();
   for (auto &framebuffer : framebuffers_) {
     vkDestroyFramebuffer(instance_.device, framebuffer, nullptr);
@@ -337,7 +337,7 @@ void VkApp::CleanupSwapchain() {
 // Subroutine
 //*-----------------------------------------------------------------------------
 
-float VkApp::CalcDeviceScore(VkPhysicalDevice device) const {
+float VkBase::CalcDeviceScore(VkPhysicalDevice device) const {
   VkPhysicalDeviceProperties prop{};
   vkGetPhysicalDeviceProperties(device, &prop);
   VkPhysicalDeviceFeatures feat{};

@@ -13,7 +13,7 @@ int main() {
   BOOST_ASSERT_MSG(config, "Failed to open Config.json!");
 
   App app(config.value());
-  std::unique_ptr<VkApp> ub = std::make_unique<UniformBuffers>();
+  std::unique_ptr<VkBase> ub = std::make_unique<UniformBuffers>();
 
   return app.Run(std::move(ub));
 }
