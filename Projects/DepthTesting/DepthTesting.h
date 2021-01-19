@@ -20,8 +20,8 @@ private:
   void CreateDepthStencil() override;
   void DestroyDepthStencil() override;
   void CreateFramebuffers() override;
-  void CreateTextures() override;
-  void DestroyTextures() override;
+  void SetupAssets() override;
+  void CleanupAssets() override;
   void CreateVertexBuffer() override;
   void CreateIndexBuffer() override;
   void CreateUniformBuffers() override;

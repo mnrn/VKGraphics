@@ -41,7 +41,7 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
   CreatePipelines();
   CreateDepthStencil();
   CreateFramebuffers();
-  CreateTextures();
+  SetupAssets();
   CreateVertexBuffer();
   CreateIndexBuffer();
   CreateUniformBuffers();
@@ -54,7 +54,7 @@ void VkApp::OnInit(const nlohmann::json &config, GLFWwindow *window) {
 void VkApp::OnDestroy() {
   CleanupSwapchain();
 
-  DestroyTextures();
+  CleanupAssets();
 
   DestroyDescriptorSetLayouts();
 

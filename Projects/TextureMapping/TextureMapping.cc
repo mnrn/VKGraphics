@@ -321,7 +321,7 @@ void TextureMapping::CreateFramebuffers() {
   }
 }
 
-void TextureMapping::CreateTextures() {
+void TextureMapping::SetupAssets() {
   texture_.Create(instance_, "./Assets/Textures/SelfMade/star.png");
 
   VkPhysicalDeviceProperties props{};
@@ -347,7 +347,7 @@ void TextureMapping::CreateTextures() {
   }
 }
 
-void TextureMapping::DestroyTextures() { texture_.Destroy(instance_); }
+void TextureMapping::CleanupAssets() { texture_.Destroy(instance_); }
 
 void TextureMapping::CreateVertexBuffer() {
   vertex_.Create(instance_, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);

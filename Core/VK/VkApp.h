@@ -51,8 +51,8 @@ protected:
   virtual void CreateDepthStencil() {}
   virtual void DestroyDepthStencil() {}
   virtual void CreateFramebuffers() = 0;
-  virtual void CreateTextures() {}
-  virtual void DestroyTextures() {}
+  virtual void SetupAssets() {}
+  virtual void CleanupAssets() {}
   virtual void CreateVertexBuffer() = 0;
   virtual void CreateIndexBuffer() = 0;
   virtual void CreateUniformBuffers() = 0;

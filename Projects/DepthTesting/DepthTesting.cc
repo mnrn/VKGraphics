@@ -357,7 +357,7 @@ void DepthTesting::CreateFramebuffers() {
   }
 }
 
-void DepthTesting::CreateTextures() {
+void DepthTesting::SetupAssets() {
   texture_.Create(instance_, "./Assets/Textures/SelfMade/star.png");
 
   VkPhysicalDeviceProperties props{};
@@ -383,7 +383,7 @@ void DepthTesting::CreateTextures() {
   }
 }
 
-void DepthTesting::DestroyTextures() { texture_.Destroy(instance_); }
+void DepthTesting::CleanupAssets() { texture_.Destroy(instance_); }
 
 void DepthTesting::CreateVertexBuffer() {
   vertex_.Create(instance_, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);

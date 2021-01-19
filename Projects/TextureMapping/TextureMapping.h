@@ -17,8 +17,8 @@ private:
   void CreatePipelines() override;
   void DestroyPipelines() override;
   void CreateFramebuffers() override;
-  void CreateTextures() override;
-  void DestroyTextures() override;
+  void SetupAssets() override;
+  void CleanupAssets() override;
   void CreateVertexBuffer() override;
   void CreateIndexBuffer() override;
   void CreateUniformBuffers() override;
