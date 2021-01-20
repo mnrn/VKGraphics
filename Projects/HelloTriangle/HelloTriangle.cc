@@ -243,7 +243,7 @@ void HelloTriangle::PreparePipelines() {
   vertexInputAttributes[1] = Initializer::VertexInputAttributeDescription(
       0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color));
 
-  // パイプラインの作成に使用される頂点入力状態
+  // パイプラインの作成に使用される頂点入力ステート
   VkPipelineVertexInputStateCreateInfo vertexInputState =
       Initializer::PipelineVertexInputStateCreateInfo();
   vertexInputState.vertexBindingDescriptionCount = 1;
