@@ -52,7 +52,7 @@ void Create(const Instance &instance, uint32_t w, uint32_t h,
 void TransitionImageLayout(const Instance &instance, VkImage image,
                            VkFormat format, VkImageLayout old,
                            VkImageLayout flesh, bool isCubeMap) {
-  VkCommandBuffer command = Command::BeginSingleTime(instance);
+  VkCommandBuffer command = Command::Get(instance);
 
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -104,6 +104,6 @@ void TransitionImageLayout(const Instance &instance, VkImage image,
 
   vkCmdPipelineBarrier(command, src, dst, 0, 0, nullptr, 0, nullptr, 1,
                        &barrier);
-  Command::EndSingleTime(instance, command);
+  Command::Flush(instance, command);
 }
 } // namespace Image

@@ -8,8 +8,6 @@
 struct Instance;
 
 namespace Shader{
-void Create(const Instance &instance, const std::string &filepath,
-            VkShaderStageFlagBits stage, VkSpecializationInfo *specialization,
-            std::vector<VkShaderModule> &modules,
-            std::vector<VkPipelineShaderStageCreateInfo> &stages);
+VkPipelineShaderStageCreateInfo Create(const Instance &instance, const std::string &filepath,
+            VkShaderStageFlagBits stage, VkSpecializationInfo *specialization = nullptr);
 }

@@ -14,7 +14,6 @@
 #include "VK/Image/Image.h"
 #include "VK/Image/ImageView.h"
 #include "VK/Instance.h"
-#include "VK/Pipeline/Pipelines.h"
 
 namespace Pixels {
 static stbi_uc *Load(const std::string &path, int &w, int &h,

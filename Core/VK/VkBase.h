@@ -4,20 +4,21 @@
 
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 #include <array>
 #include <boost/noncopyable.hpp>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <vector>
 
-#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include "VK/Buffer/Buffer.h"
+#include "VK/Buffer/DepthStencil.h"
 #include "VK/Debug.h"
 #include "VK/Instance.h"
 #include "VK/Swapchain.h"
-#include "VK/Sync/SyncObjects.h"
 
 class VkBase : private boost::noncopyable {
 public:
@@ -26,7 +27,7 @@ public:
 
   virtual void OnInit(const nlohmann::json &config, GLFWwindow *window);
   virtual void OnDestroy();
-  virtual void OnUpdate(float t);
+  virtual void OnUpdate(float);
   virtual void OnRender();
 
   void WaitIdle() const;
@@ -38,54 +39,67 @@ protected:
   void CreateSurface();
   void SelectPhysicalDevice();
   void CreateLogicalDevice();
-  float CalcDeviceScore(VkPhysicalDevice physicalDevice) const;
+
+  virtual void OnPostInit();
+  virtual void OnPreDestroy();
 
   void CreateSwapchain(int width, int height);
+  void CreatePipelineCache();
   void CreateCommandPool();
+  void CreateCommandBuffers();
+  void DestroyCommandBuffers();
 
-  virtual void CreateRenderPass() = 0;
-  virtual void CreateDescriptorSetLayouts() = 0;
-  virtual void DestroyDescriptorSetLayouts() = 0;
-  virtual void CreatePipelines() = 0;
-  virtual void DestroyPipelines() = 0;
-  virtual void CreateDepthStencil() {}
-  virtual void DestroyDepthStencil() {}
-  virtual void CreateFramebuffers() = 0;
-  virtual void SetupAssets() {}
-  virtual void CleanupAssets() {}
-  virtual void CreateVertexBuffer() = 0;
-  virtual void CreateIndexBuffer() = 0;
-  virtual void CreateUniformBuffers() = 0;
-  virtual void DestroyUniformBuffers() = 0;
-  virtual void CreateDescriptorPool() = 0;
-  virtual void CreateDescriptorSets() = 0;
-  virtual void CreateDrawCommandBuffers() = 0;
+  virtual void SetupRenderPass();
+  virtual void SetupDepthStencil();
+  virtual void SetupFramebuffers();
+  virtual void BuildCommandBuffers();
 
-  void CreateSyncObjects();
+  void CreateSemaphores();
+  void CreateFence();
+  void DestroySyncObjects();
 
-  virtual void CleanupSwapchain();
-  virtual void RecreateSwapchain();
-  virtual void UpdateUniformBuffers(uint32_t currentImage) {
-    static_cast<void>(currentImage);
-  }
+  void PrepareFrame();
+  void RenderFrame();
+  void SubmitFrame();
 
-  static constexpr size_t kMaxFramesInFlight = 2;
+  virtual void ResizeWindow();
+  virtual void ViewChanged();
 
-  Instance instance_{};
-  Swapchain swapchain_{};
-  VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
-  VkRenderPass renderPass_ = VK_NULL_HANDLE;
-  struct CommandBuffers {
-    std::vector<VkCommandBuffer> draw;
-  } commandBuffers_{};
-  std::vector<VkFramebuffer> framebuffers_{};
-  Buffer vertex_{};
-  Buffer index_{};
-  SyncObjects syncs_{};
+  // Vulkan Instance
+  Instance instance{};
+  // Swap chain to present images (framebuffers) to the windowing system
+  Swapchain swapchain{};
+  VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+  // フレームバッファに書き込むグローバルレンダーパス
+  VkRenderPass renderPass = VK_NULL_HANDLE;
+  // レンダリングに使用されるコマンドバッファ
+  std::vector<VkCommandBuffer> drawCmdBuffers{};
+  // 使用可能なフレームバッファのリスト(スワップチェーンイメージの数と同じになります。)
+  std::vector<VkFramebuffer> framebuffers{};
+  // 現在使用しているフレームバッファのインデックス
+  uint32_t currentBuffer = 0;
+  // 同期セマフォ
+  struct {
+    // swap chain imagesの表示を交換します。
+    VkSemaphore presentComplete = VK_NULL_HANDLE;
+    // コマンドバッファの送信と実行に用います。
+    VkSemaphore renderComplete = VK_NULL_HANDLE;
+  } semaphores{};
+  std::vector<VkFence> waitFences{};
+  // キューに提示されるコマンドバッファとセマフォが含まれます。
+  VkSubmitInfo submitInfo;
+  // グラフィックキューの送信を待機するために使用されるパイプラインステージ
+  VkPipelineStageFlags submitPipelineStages =
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  // Pipeline cache object
+  VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+  // Depth stencil object
+  DepthStencil depthStencil;
 
-  GLFWwindow *window_ = nullptr;
-  nlohmann::json config_{};
+  GLFWwindow *window = nullptr;
+  nlohmann::json config{};
   bool isFramebufferResized_ = false;
+
 #if !defined(NDEBUG)
   DebugMessenger debug_{};
 #endif

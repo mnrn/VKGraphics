@@ -1,9 +1,17 @@
 #include "HelloTriangle.h"
 
-#include <boost/assert.hpp>
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <array>
+#include <boost/assert.hpp>
 #include <vector>
 
+#include "VK/Buffer/Command.h"
+#include "VK/Buffer/Memory.h"
+#include "VK/Common.h"
+#include "VK/Initializer.h"
 #include "VK/Pipeline/Shader.h"
 
 //*-----------------------------------------------------------------------------
@@ -11,314 +19,540 @@
 //*-----------------------------------------------------------------------------
 
 struct Vertex {
-  glm::vec2 pos;
+  glm::vec3 pos;
   glm::vec3 color;
-
-  static VkVertexInputBindingDescription Bindings() {
-    VkVertexInputBindingDescription bind;
-    bind.binding = 0;
-    bind.stride = sizeof(Vertex);
-    bind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bind;
-  }
-
-  static std::array<VkVertexInputAttributeDescription, 2> Attributes() {
-    std::array<VkVertexInputAttributeDescription, 2> attr{};
-    attr[0].binding = 0;
-    attr[0].location = 0;
-    attr[0].format = VK_FORMAT_R32G32_SFLOAT;
-    attr[0].offset = offsetof(Vertex, pos);
-    attr[1].binding = 0;
-    attr[1].location = 1;
-    attr[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attr[1].offset = offsetof(Vertex, color);
-
-    return attr;
-  }
 };
 
-static const std::vector<Vertex> vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                          {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-                                          {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-static const std::vector<uint16_t> indices{2, 1, 0};
+struct UniformBufferObject {
+  alignas(16) glm::mat4 model;
+  alignas(16) glm::mat4 view;
+  alignas(16) glm::mat4 proj;
+};
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
 //*-----------------------------------------------------------------------------
 
-void HelloTriangle::CreateRenderPass() {
-  VkAttachmentDescription color{};
-  color.format = swapchain_.format;
-  color.samples = VK_SAMPLE_COUNT_1_BIT;
-  color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+void HelloTriangle::OnPostInit() {
+  VkBase::OnPostInit();
 
-  VkAttachmentReference colorRef{};
-  colorRef.attachment = 0;
-  colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  PrepareVertices();
+  PrepareUniformBuffers();
 
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorRef;
-  subpass.pDepthStencilAttachment = nullptr;
+  SetupDescriptorSetLayout();
+  PreparePipelines();
+  SetupDescriptorPool();
+  SetupDescriptorSet();
 
-  VkSubpassDependency dependency{};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  std::vector<VkAttachmentDescription> attachments{color};
-  VkRenderPassCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  create.attachmentCount = static_cast<uint32_t>(attachments.size());
-  create.pAttachments = attachments.data();
-  create.subpassCount = 1;
-  create.pSubpasses = &subpass;
-  create.dependencyCount = 1;
-  create.pDependencies = &dependency;
-
-  if (vkCreateRenderPass(instance_.device, &create, nullptr, &renderPass_)) {
-    BOOST_ASSERT_MSG(false, "Failed to create render pass!");
-  }
+  BuildCommandBuffers();
 }
 
-void HelloTriangle::CreatePipelines() {
-  {
-    VkPipelineLayoutCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create.setLayoutCount = 0;
-    if (vkCreatePipelineLayout(instance_.device, &create, nullptr,
-                               &pipelines_.layout)) {
-      BOOST_ASSERT_MSG(false, "Failed to create pipeline layout");
-    }
-  }
+void HelloTriangle::OnPreDestroy() {
+  vkDestroyBuffer(instance.device, uniform.buffer, nullptr);
+  vkFreeMemory(instance.device, uniform.memory, nullptr);
 
-  for (const auto &pipeline : config_["Pipelines"]) {
-    std::vector<VkShaderModule> modules;
-    std::vector<VkPipelineShaderStageCreateInfo> stages;
+  vkDestroyBuffer(instance.device, indices.buffer, nullptr);
+  vkFreeMemory(instance.device, indices.memory, nullptr);
 
-    {
-      const std::string &vs = pipeline["VertexShader"].get<std::string>();
-      Shader::Create(instance_, vs, VK_SHADER_STAGE_VERTEX_BIT, nullptr,
-                     modules, stages);
-      const std::string &fs = pipeline["FragmentShader"].get<std::string>();
-      Shader::Create(instance_, fs, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr,
-                     modules, stages);
-    }
+  vkDestroyBuffer(instance.device, vertices.buffer, nullptr);
+  vkFreeMemory(instance.device, vertices.memory, nullptr);
 
-    auto binds = Vertex::Bindings();
-    auto attrs = Vertex::Attributes();
-    VkPipelineVertexInputStateCreateInfo vi{};
-    vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vi.vertexBindingDescriptionCount = 1;
-    vi.pVertexBindingDescriptions = &binds;
-    vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
-    vi.pVertexAttributeDescriptions = attrs.data();
+  vkDestroyDescriptorSetLayout(instance.device, descriptorSetLayout, nullptr);
 
-    VkPipelineInputAssemblyStateCreateInfo as{};
-    as.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    as.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    as.primitiveRestartEnable = VK_FALSE;
-
-    VkViewport vp{};
-    vp.x = 0.0f;
-    vp.y = 0.0f;
-    vp.width = static_cast<float>(swapchain_.extent.width);
-    vp.height = static_cast<float>(swapchain_.extent.height);
-    vp.minDepth = 0.0f;
-    vp.maxDepth = 1.0f;
-
-    VkRect2D sc{};
-    sc.offset = {0, 0};
-    sc.extent = swapchain_.extent;
-
-    VkPipelineViewportStateCreateInfo vs{};
-    vs.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    vs.viewportCount = 1;
-    vs.pViewports = &vp;
-    vs.scissorCount = 1;
-    vs.pScissors = &sc;
-
-    VkPipelineRasterizationStateCreateInfo rz{};
-    rz.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rz.depthClampEnable = VK_FALSE;
-    rz.rasterizerDiscardEnable = VK_FALSE;
-    rz.polygonMode = VK_POLYGON_MODE_FILL;
-    rz.lineWidth = 1.0f;
-    rz.cullMode = VK_CULL_MODE_BACK_BIT;
-    rz.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rz.depthBiasEnable = VK_FALSE;
-    rz.depthBiasConstantFactor = 0.0f;
-    rz.depthBiasClamp = 0.0f;
-    rz.depthBiasSlopeFactor = 0.0f;
-
-    VkPipelineMultisampleStateCreateInfo ms{};
-    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    ms.sampleShadingEnable = VK_FALSE;
-    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    ms.minSampleShading = 1.0f;
-    ms.pSampleMask = nullptr;
-    ms.alphaToCoverageEnable = VK_FALSE;
-    ms.alphaToOneEnable = VK_FALSE;
-
-    VkPipelineColorBlendAttachmentState bl{};
-    bl.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    bl.blendEnable = VK_FALSE;
-    bl.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    bl.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-    bl.colorBlendOp = VK_BLEND_OP_ADD;
-    bl.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    bl.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    bl.alphaBlendOp = VK_BLEND_OP_ADD;
-
-    VkPipelineColorBlendStateCreateInfo bs{};
-    bs.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    bs.logicOpEnable = VK_FALSE;
-    bs.logicOp = VK_LOGIC_OP_COPY;
-    bs.attachmentCount = 1;
-    bs.pAttachments = &bl;
-    bs.blendConstants[0] = 0.0f;
-    bs.blendConstants[1] = 0.0f;
-    bs.blendConstants[2] = 0.0f;
-    bs.blendConstants[3] = 0.0f;
-
-    VkPipelineDepthStencilStateCreateInfo ds{};
-    ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    ds.depthTestEnable = VK_TRUE;
-    ds.depthWriteEnable = VK_TRUE;
-    ds.depthCompareOp = VK_COMPARE_OP_LESS;
-    ds.depthBoundsTestEnable = VK_FALSE;
-    ds.minDepthBounds = 0.0f;
-    ds.maxDepthBounds = 1.0f;
-    ds.stencilTestEnable = VK_FALSE;
-    ds.front = {};
-    ds.back = {};
-
-    VkGraphicsPipelineCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    create.stageCount = static_cast<uint32_t>(stages.size());
-    create.pStages = stages.data();
-    create.pVertexInputState = &vi;
-    create.pInputAssemblyState = &as;
-    create.pViewportState = &vs;
-    create.pRasterizationState = &rz;
-    create.pMultisampleState = &ms;
-    create.pDepthStencilState = &ds;
-    create.pColorBlendState = &bs;
-    create.pDynamicState = nullptr;
-    create.layout = pipelines_.layout;
-    create.renderPass = renderPass_;
-    create.subpass = 0;
-    create.basePipelineHandle = VK_NULL_HANDLE;
-    create.basePipelineIndex = -1;
-
-    VkPipeline handle;
-    if (vkCreateGraphicsPipelines(instance_.device, VK_NULL_HANDLE, 1, &create,
-                                  nullptr, &handle)) {
-      BOOST_ASSERT_MSG(false, "Failed to create graphics pipeline");
-    }
-    pipelines_.handles.emplace_back(handle);
-    for (const auto &module : modules) {
-      vkDestroyShaderModule(instance_.device, module, nullptr);
-    }
-  }
+  vkDestroyPipeline(instance.device, pipeline, nullptr);
+  vkDestroyPipelineLayout(instance.device, pipelineLayout, nullptr);
 }
 
-void HelloTriangle::DestroyPipelines() {
-  pipelines_.Destroy(instance_);
-}
+/**
+ * @brief フレームバッファイメージごとに個別のコマンドバッファを構築します。
+ * @note
+ * OpenGLとは異なり、すべてのレンダリングコマンドはコマンドバッファに一度記録され、その後キューに再送信されます。<br>
+ * これにより、Vulkanの最大の利点の１つである、複数のスレッドから事前に作業を生成できます。
+ */
+void HelloTriangle::BuildCommandBuffers() {
+  VkCommandBufferBeginInfo commandBufferBeginInfo =
+      Initializer::CommandBufferBeginInfo();
 
-void HelloTriangle::CreateFramebuffers() {
-  framebuffers_.resize(swapchain_.views.size());
-  for (size_t i = 0; i < framebuffers_.size(); i++) {
-    std::vector<VkImageView> attachments = {swapchain_.views[i],
-                                            /* depthView */};
-    VkFramebufferCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    create.renderPass = renderPass_;
-    create.attachmentCount = static_cast<uint32_t>(attachments.size());
-    create.pAttachments = attachments.data();
-    create.width = swapchain_.extent.width;
-    create.height = swapchain_.extent.height;
-    create.layers = 1;
-    if (vkCreateFramebuffer(instance_.device, &create, nullptr,
-                            &framebuffers_[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to create framebuffer!");
-    }
-  }
-}
+  // LoadOpをclearに設定して　すべてのフレームバッファにclear値を設定します。
+  // サブパスの開始時にクリアされる2つのアタッチメント(カラーとデプス)を使用するため、両方にクリア値を設定する必要があります。
+  std::array<VkClearValue, 2> clear{};
+  clear[0].color = {{0.0f, 0.0f, 0.2f, 1.0f}};
+  clear[1].depthStencil = {1.0f, 0};
 
-void HelloTriangle::CreateVertexBuffer() {
-  vertex_.Create(instance_, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-}
+  VkRenderPassBeginInfo renderPassBeginInfo =
+      Initializer::RenderPassBeginInfo();
+  renderPassBeginInfo.renderPass = renderPass;
+  renderPassBeginInfo.renderArea.offset.x = 0;
+  renderPassBeginInfo.renderArea.offset.y = 0;
+  renderPassBeginInfo.renderArea.extent.width = swapchain.extent.width;
+  renderPassBeginInfo.renderArea.extent.height = swapchain.extent.height;
+  renderPassBeginInfo.clearValueCount = 2;
+  renderPassBeginInfo.pClearValues = clear.data();
 
-void HelloTriangle::CreateIndexBuffer() {
-  index_.Create(instance_, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-}
+  for (size_t i = 0; i < drawCmdBuffers.size(); i++) {
+    // ターゲットフレームバッファを設定します。
+    renderPassBeginInfo.framebuffer = framebuffers[i];
+    VK_CHECK_RESULT(
+        vkBeginCommandBuffer(drawCmdBuffers[i], &commandBufferBeginInfo));
 
-void HelloTriangle::CreateDrawCommandBuffers() {
-  commandBuffers_.draw.resize(framebuffers_.size());
-
-  VkCommandBufferAllocateInfo alloc{};
-  alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc.commandPool = instance_.pool;
-  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc.commandBufferCount = static_cast<uint32_t>(commandBuffers_.draw.size());
-  if (vkAllocateCommandBuffers(instance_.device, &alloc,
-                               commandBuffers_.draw.data())) {
-    BOOST_ASSERT_MSG(false, "Failed to alloc draw command buffers!");
-  }
-
-  for (size_t i = 0; i < commandBuffers_.draw.size(); i++) {
-    VkCommandBufferBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-    begin.pInheritanceInfo = nullptr;
-
-    if (vkBeginCommandBuffer(commandBuffers_.draw[i], &begin)) {
-      BOOST_ASSERT_MSG(false, "Failed to begin recording command buffer!");
-    }
-
-    VkRenderPassBeginInfo render{};
-    render.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render.renderPass = renderPass_;
-    render.framebuffer = framebuffers_[i];
-    render.renderArea.offset = {0, 0};
-    render.renderArea.extent = swapchain_.extent;
-
-    std::array<VkClearValue, 1> clear{};
-    clear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    render.clearValueCount = static_cast<uint32_t>(clear.size());
-    render.pClearValues = clear.data();
-
-    vkCmdBeginRenderPass(commandBuffers_.draw[i], &render,
+    // デフォルトのレンダーパス設定で指定された最初のサブパスを開始します。
+    // これにより、色と奥行きのアタッチメントがクリアされます。
+    vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
-    {
-      vkCmdBindPipeline(commandBuffers_.draw[i],
-                        VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1, &vertex_.buffer,
-                             offsets);
-      vkCmdBindIndexBuffer(commandBuffers_.draw[i], index_.buffer, 0,
-                           VK_INDEX_TYPE_UINT16);
 
-      vkCmdDrawIndexed(commandBuffers_.draw[i],
-                       static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-    }
-    vkCmdEndRenderPass(commandBuffers_.draw[i]);
+    // ビューポートの更新
+    VkViewport viewport = Initializer::Viewport(
+        static_cast<float>(swapchain.extent.width),
+        static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
+    vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-    if (vkEndCommandBuffer(commandBuffers_.draw[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to record draw command buffer!");
-    }
+    // シザー(矩形)の更新
+    VkRect2D scissor = Initializer::Rect2D(swapchain.extent.width,
+                                           swapchain.extent.height, 0, 0);
+    vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+
+    // シェーダーバインディングポイントを記述するvkCmdBindDescriptorSets
+    vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
+    // レンダリングパイプラインをバインドします。
+    // パイプライン(PSO)にはレンダリングパイプラインのすべての状態が含まれ、
+    // バインドするとパイプラインの作成時に指定されたすべての状態が設定されます。
+    vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipeline);
+
+    // 三角形の頂点バッファをバインドします。
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertices.buffer, offsets);
+
+    // 三角形のインデックスバッファをバインドします。
+    vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.buffer, 0,
+                         VK_INDEX_TYPE_UINT32);
+
+    // インデックス付きの三角形を描画します。
+    vkCmdDrawIndexed(drawCmdBuffers[i], indices.count, 1, 0, 0, 1);
+
+    vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+    // レンダーパスを終了すると、フレームバッファのカラーアタッチメントに移行する暗黙のバリアが追加されます。
+    VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
   }
+}
+
+//*-----------------------------------------------------------------------------
+// Setup
+//*-----------------------------------------------------------------------------
+
+/**
+ * @brief この例で使用される記述子のレイアウトを設定します。<br>
+ * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
+ * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
+ */
+void HelloTriangle::SetupDescriptorSetLayout() {
+  // Binding 0: Uniform buffer (Vertex shader)
+  VkDescriptorSetLayoutBinding layoutBinding =
+      Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                              VK_SHADER_STAGE_VERTEX_BIT, 0);
+
+  VkDescriptorSetLayoutCreateInfo descriptorLayout =
+      Initializer::DescriptorSetLayoutCreateInfo(&layoutBinding, 1);
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+      instance.device, &descriptorLayout, nullptr, &descriptorSetLayout));
+
+  // この記述子セットレイアウトに基づくレンダリングパイプラインを生成するために使用されるパイプラインレイアウトを作成します。
+  // より複雑なシナリオでは、再利用できる記述子セットのレイアウトごとに異なるパイプラインレイアウトがあります。
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
+      Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
+
+  VK_CHECK_RESULT(vkCreatePipelineLayout(
+      instance.device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+}
+
+/**
+ * @note
+ * Vulkanは、レンダリングパイプラインの概念を用いてFixedStatusをカプセル化し、OpenGLの複雑なステートマシンを置き換えます。<br>
+ * パイプラインはGPUに保存およびハッシュされ、パイプラインの変更が非常に高速になります。
+ */
+void HelloTriangle::PreparePipelines() {
+  // パイプラインに使用されるレイアウトとレンダーパスを指定します。
+  VkGraphicsPipelineCreateInfo pipelineCreateInfo =
+      Initializer::PipelineCreateInfo(pipelineLayout, renderPass);
+
+  // 入力アセンブリステートはプリミティブがどのようにアセンブルされるかを記述します。
+  // このパイプラインでは、頂点データを三角形リストとしてアセンブルします。
+  VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
+      Initializer::PipelineInputAssemblyStateCreateInfo(
+          VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+
+  // ラスタライズステート
+  VkPipelineRasterizationStateCreateInfo rasterizationState =
+      Initializer::PipelineRasterizationStateCreateInfo(
+          VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE,
+          VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
+  // カラーブレンドステートは、ブレンド係数の計算方法を示します。
+  // カラーアタッチメントごとに１つのブレンドアタッチメント状態が必要です。
+  VkPipelineColorBlendAttachmentState blendAttachmentState =
+      Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE);
+  VkPipelineColorBlendStateCreateInfo colorBlendState =
+      Initializer::PipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+
+  // ビューポートステートは、このパイプラインで使用されるビューポートとシザーの数を設定します。
+  // NOTE: これは実際には動的にオーバーライドされます。
+  VkPipelineViewportStateCreateInfo viewportState =
+      Initializer::PipelineViewportStateCreateInfo(1, 1);
+
+  // ダイナミックステートを有効にします。
+  // ほとんどのステートはパイプラインに組み込まれていますが、コマンドバッファ内で変更できる動的なステートがまだいくつかあります。
+  // これらを変更できるようにするには、ダイナミックステートを指定する必要があります。それらの実際の状態は、後でコマンドバッファに設定されます。
+  std::vector<VkDynamicState> dynamicStates;
+  dynamicStates.emplace_back(VK_DYNAMIC_STATE_VIEWPORT);
+  dynamicStates.emplace_back(VK_DYNAMIC_STATE_SCISSOR);
+  VkPipelineDynamicStateCreateInfo dynamicState =
+      Initializer::PipelineDynamicStateCreateInfo(dynamicStates);
+
+  // 深度とステンシルの比較およびテスト操作を含むデプスステンシルステート
+  // 深度テストのみを使用し、深度テストと書き込みを有効にします。
+  VkPipelineDepthStencilStateCreateInfo depthStencilState =
+      Initializer::PipelineDepthStencilStateCreateInfo(
+          VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+  depthStencilState.depthBoundsTestEnable = VK_FALSE;
+  depthStencilState.back.failOp = VK_STENCIL_OP_KEEP;
+  depthStencilState.back.passOp = VK_STENCIL_OP_KEEP;
+  depthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
+  depthStencilState.stencilTestEnable = VK_FALSE;
+  depthStencilState.front = depthStencilState.back;
+
+  // マルチサンプリングステート
+  // この例では、マルチサンプリングを使用していません。
+  VkPipelineMultisampleStateCreateInfo multisampleState =
+      Initializer::PipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
+  multisampleState.pSampleMask = nullptr;
+
+  // 頂点入力バインディング
+  // この例では、バインディングポイント0で単一の頂点入力バインディングを使用しています。
+  VkVertexInputBindingDescription vertexInputBindingDescription =
+      Initializer::VertexInputBindingDescription(0, sizeof(Vertex),
+                                                 VK_VERTEX_INPUT_RATE_VERTEX);
+
+  // 入力属性バインディングはシェーダー属性の場所とメモリレイアウトを記述します。
+  // これらはシェーダーレイアウトに一致します。
+  std::array<VkVertexInputAttributeDescription, 2> vertexInputAttributes{};
+  vertexInputAttributes[0] = Initializer::VertexInputAttributeDescription(
+      0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos));
+  vertexInputAttributes[1] = Initializer::VertexInputAttributeDescription(
+      0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color));
+
+  // パイプラインの作成に使用される頂点入力状態
+  VkPipelineVertexInputStateCreateInfo vertexInputState =
+      Initializer::PipelineVertexInputStateCreateInfo();
+  vertexInputState.vertexBindingDescriptionCount = 1;
+  vertexInputState.pVertexBindingDescriptions = &vertexInputBindingDescription;
+  vertexInputState.vertexAttributeDescriptionCount = 2;
+  vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
+
+  std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+  shaderStages[0] =
+      Shader::Create(instance, config["VertexShader"].get<std::string>(),
+                     VK_SHADER_STAGE_VERTEX_BIT);
+  shaderStages[1] =
+      Shader::Create(instance, config["FragmentShader"].get<std::string>(),
+                     VK_SHADER_STAGE_FRAGMENT_BIT);
+
+  // パイプラインシェーダーステージ情報を設定します。
+  pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+  pipelineCreateInfo.pStages = shaderStages.data();
+
+  // パイプラインステートをpipelineCreateInfoに代入してきます。
+  pipelineCreateInfo.pVertexInputState = &vertexInputState;
+  pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+  pipelineCreateInfo.pRasterizationState = &rasterizationState;
+  pipelineCreateInfo.pColorBlendState = &colorBlendState;
+  pipelineCreateInfo.pMultisampleState = &multisampleState;
+  pipelineCreateInfo.pViewportState = &viewportState;
+  pipelineCreateInfo.pDepthStencilState = &depthStencilState;
+  pipelineCreateInfo.pDynamicState = &dynamicState;
+
+  // 指定されたステートを使用してレンダリングパイプラインを作成します。
+  VK_CHECK_RESULT(vkCreateGraphicsPipelines(instance.device, pipelineCache, 1,
+                                            &pipelineCreateInfo, nullptr,
+                                            &pipeline));
+
+  // グラフィックスパイプラインを作成した後は、シェーダーモジュールは不要になります。
+  vkDestroyShaderModule(instance.device, shaderStages[0].module, nullptr);
+  vkDestroyShaderModule(instance.device, shaderStages[1].module, nullptr);
+}
+
+void HelloTriangle::SetupDescriptorPool() {
+  // APIに記述子の最大数を通知する必要があります。
+  VkDescriptorPoolSize typeCount =
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+
+  // グローバル記述子プールを生成します。
+  VkDescriptorPoolCreateInfo descriptorPoolInfo =
+      Initializer::DescriptorPoolCreateInfo(1, &typeCount, 1);
+
+  VK_CHECK_RESULT(vkCreateDescriptorPool(instance.device, &descriptorPoolInfo,
+                                         nullptr, &descriptorPool));
+}
+
+void HelloTriangle::SetupDescriptorSet() {
+  // グローバル記述子プールから新しい記述子セットを割り当てます。
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo =
+      Initializer::DescriptorSetAllocateInfo(descriptorPool,
+                                             &descriptorSetLayout, 1);
+
+  VK_CHECK_RESULT(vkAllocateDescriptorSets(
+      instance.device, &descriptorSetAllocateInfo, &descriptorSet));
+
+  // シェーダーバインディングポイントを決定する記述子セットを更新します。
+  // シェーダーで使用されるすべてのバインディングポイントにはそのバインディングポイントに一致する記述子セットが必要です。
+  VkWriteDescriptorSet writeDescriptorSet = Initializer::WriteDescriptorSet(
+      descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniform.descriptor);
+
+  vkUpdateDescriptorSets(instance.device, 1, &writeDescriptorSet, 0, nullptr);
+}
+
+//*-----------------------------------------------------------------------------
+// Prepare
+//*-----------------------------------------------------------------------------
+
+/**
+ * @brief
+ * インデックス付き三角形の頂点バッファとインデックスバッファを準備します。
+ * @note
+ * ステージングを使用して、それらをデバイスのローカルメモリにアップロードし、頂点シェーダーに一致するように頂点入力と属性バインディングを初期化します。
+ */
+void HelloTriangle::PrepareVertices() {
+  // 頂点を設定します。
+  std::vector<Vertex> vertexBuffer = {
+      {{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+      {{-1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+      {{0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
+
+  uint32_t vertexBufferSize =
+      static_cast<uint32_t>(vertexBuffer.size()) * sizeof(Vertex);
+
+  // インデックスを設定します。
+  std::vector<uint32_t> indexBuffer = {0, 1, 2};
+  indices.count = static_cast<uint32_t>(indexBuffer.size());
+  uint32_t indexBufferSize = indices.count * sizeof(uint32_t);
+
+  // 頂点やインデックスバッファなどの静的データはGPUによる最適な(そして最速の)アクセスのためにデバイスメモリに保存する必要があります。
+  // これを実現するために、いわゆる「ステージングバッファ」を使用します。
+  // - ホストに表示される(マップ可能な)バッファを生成します。
+  // - データをこのバッファにコピーします。
+  // - 同じサイズのデバイス(VRAM)でローカルな別のバッファを生成します。
+  // - コマンドバッファを使用して、ホストからデバイスにデータをコピーします。
+  // - ホストの可視(ステージング)バッファを削除します。
+  // - レンダリングにデバイスのローカルバッファを使用します。
+  struct StagingBuffer {
+    VkDeviceMemory memory;
+    VkBuffer buffer;
+  };
+  struct {
+    StagingBuffer vertices;
+    StagingBuffer indices;
+  } stagingBuffers{};
+
+  // 頂点バッファ
+  VkBufferCreateInfo vertexBufferCreateInfo = Initializer::BufferCreateInfo(
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT, vertexBufferSize);
+  //頂点データをコピーするホストに表示されるバッファ(ステージングバッファ)を生成します。
+  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &vertexBufferCreateInfo,
+                                 nullptr, &(stagingBuffers.vertices.buffer)));
+
+  // データのコピーに使用できるホストの可視メモリタイプを要求します。
+  // また、バッファのマッピングを解除した直後に書き込みがGPUに表示されるようにコヒーレント(干渉可能)であることを要求します。
+  VkMemoryRequirements memoryRequirements{};
+  vkGetBufferMemoryRequirements(instance.device, stagingBuffers.vertices.buffer,
+                                &memoryRequirements);
+  VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  if (const auto memoryType =
+          Memory::FindType(memoryRequirements.memoryTypeBits,
+                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                           instance.physicalDevice)) {
+    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
+  } else {
+    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
+  }
+  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
+                                   nullptr, &stagingBuffers.vertices.memory));
+
+  // マップしてコピーします。
+  void *data;
+  VK_CHECK_RESULT(vkMapMemory(instance.device, stagingBuffers.vertices.memory,
+                              0, memoryAllocateInfo.allocationSize, 0, &data));
+  std::memcpy(data, vertexBuffer.data(), vertexBufferSize);
+  vkUnmapMemory(instance.device, stagingBuffers.vertices.memory);
+  VK_CHECK_RESULT(vkBindBufferMemory(instance.device,
+                                     stagingBuffers.vertices.buffer,
+                                     stagingBuffers.vertices.memory, 0));
+
+  // (ホストローカル)頂点データがコピーされ、レンダリングに使用されるデバイスローカルバッファを生成します。
+  vertexBufferCreateInfo.usage =
+      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &vertexBufferCreateInfo,
+                                 nullptr, &vertices.buffer));
+  vkGetBufferMemoryRequirements(instance.device, vertices.buffer,
+                                &memoryRequirements);
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  if (const auto memoryType = Memory::FindType(
+          memoryRequirements.memoryTypeBits,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance.physicalDevice)) {
+    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
+  } else {
+    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
+  }
+  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
+                                   nullptr, &vertices.memory));
+  VK_CHECK_RESULT(
+      vkBindBufferMemory(instance.device, vertices.buffer, vertices.memory, 0));
+
+  // インデックスバッファ
+  VkBufferCreateInfo indexBufferCreateInfo = Initializer::BufferCreateInfo(
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT, indexBufferSize);
+
+  // インデックスデータをホストに表示されるバッファ(ステージングバッファ)にコピーします。
+  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &indexBufferCreateInfo,
+                                 nullptr, &stagingBuffers.indices.buffer));
+  vkGetBufferMemoryRequirements(instance.device, stagingBuffers.indices.buffer,
+                                &memoryRequirements);
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  if (const auto memoryType =
+          Memory::FindType(memoryRequirements.memoryTypeBits,
+                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                           instance.physicalDevice)) {
+    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
+  } else {
+    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
+  }
+  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
+                                   nullptr, &stagingBuffers.indices.memory));
+  VK_CHECK_RESULT(vkMapMemory(instance.device, stagingBuffers.indices.memory, 0,
+                              indexBufferSize, 0, &data));
+  std::memcpy(data, indexBuffer.data(), indexBufferSize);
+  vkUnmapMemory(instance.device, stagingBuffers.indices.memory);
+  VK_CHECK_RESULT(vkBindBufferMemory(instance.device,
+                                     stagingBuffers.indices.buffer,
+                                     stagingBuffers.indices.memory, 0));
+
+  // デバイス側のみ可視としバッファを生成します。
+  indexBufferCreateInfo.usage =
+      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &indexBufferCreateInfo,
+                                 nullptr, &indices.buffer));
+  vkGetBufferMemoryRequirements(instance.device, indices.buffer,
+                                &memoryRequirements);
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  if (const auto memoryType = Memory::FindType(
+          memoryRequirements.memoryTypeBits,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance.physicalDevice)) {
+    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
+  } else {
+    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
+  }
+  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
+                                   nullptr, &indices.memory));
+  VK_CHECK_RESULT(
+      vkBindBufferMemory(instance.device, indices.buffer, indices.memory, 0));
+
+  // バッファコピーはキューに送信する必要があるため、それらのコマンドバッファが必要です。
+  // NOTE:一部のデバイスは、大量のコピーを実行する場合に高速になる可能性がある専用の転送キュー(転送ビットのみが設定されている)を提供します。
+  VkCommandBuffer copyCmd = Command::Get(instance);
+
+  // バッファ領域のコピーをコマンドバッファに代入します。
+  VkBufferCopy copyRegion{};
+
+  // 頂点バッファ
+  copyRegion.size = vertexBufferSize;
+  vkCmdCopyBuffer(copyCmd, stagingBuffers.vertices.buffer, vertices.buffer, 1,
+                  &copyRegion);
+
+  // インデックスバッファ
+  copyRegion.size = indexBufferSize;
+  vkCmdCopyBuffer(copyCmd, stagingBuffers.indices.buffer, indices.buffer, 1,
+                  &copyRegion);
+
+  // コマンドバッファをフラッシュすると、それもキューに送信され、フェンスを使用して、戻る前にすべてのコマンドが実行されたことを確認します。
+  Command::Flush(instance, copyCmd);
+
+  // ステージングバッファを破棄します。
+  // NOTE:コピーを送信して実行する前に、ステージングバッファを削除しないでください。
+  vkDestroyBuffer(instance.device, stagingBuffers.vertices.buffer, nullptr);
+  vkFreeMemory(instance.device, stagingBuffers.vertices.memory, nullptr);
+  vkDestroyBuffer(instance.device, stagingBuffers.indices.buffer, nullptr);
+  vkFreeMemory(instance.device, stagingBuffers.indices.memory, nullptr);
+}
+
+/**
+ * @brief
+ * シェーダーユニフォームを含むユニフォームバッファブロックを準備して初期化します。
+ * @note
+ * OpenGLのような単一のユニフォームはVulkanに存在しなくなりました。すべてのシェーダーユニフォームはユニフォームバッファブロックを介して渡されます。
+ */
+void HelloTriangle::PrepareUniformBuffers() {
+  // このバッファをユニフォームバッファとして使用されます。
+  VkBufferCreateInfo bufferCreateInfo = Initializer::BufferCreateInfo(
+      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(UniformBufferObject));
+  // 新しいバッファを作成します。
+  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &bufferCreateInfo, nullptr,
+                                 &uniform.buffer));
+
+  // サイズ、配置、メモリタイプなどのメモリ要件を取得します。
+  VkMemoryRequirements memReqs;
+  vkGetBufferMemoryRequirements(instance.device, uniform.buffer, &memReqs);
+
+  VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
+  memoryAllocateInfo.allocationSize = memReqs.size;
+  const auto memoryType =
+      Memory::FindType(memReqs.memoryTypeBits,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                       instance.physicalDevice);
+  BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
+  memoryAllocateInfo.memoryTypeIndex = memoryType.value();
+
+  // ユニフォームバッファをメモリに割り当てます。
+  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
+                                   nullptr, &(uniform.memory)));
+  // メモリをバッファにバインドします。
+  VK_CHECK_RESULT(
+      vkBindBufferMemory(instance.device, uniform.buffer, uniform.memory, 0));
+
+  // 記述子セットで使用されるユニフォームの記述子に情報を格納します。
+  uniform.descriptor.buffer = uniform.buffer;
+  uniform.descriptor.offset = 0;
+  uniform.descriptor.range = sizeof(UniformBufferObject);
+
+  UpdateUniformBuffers();
+}
+
+//*-----------------------------------------------------------------------------
+// Update
+//*-----------------------------------------------------------------------------
+
+void HelloTriangle::UpdateUniformBuffers() {
+  // 行列をシェーダーに渡します。
+  UniformBufferObject ubo{};
+  ubo.model = glm::mat4(1.0f);
+  ubo.view =
+      glm::lookAt(glm::vec3(0.0f, 0.0f, -2.5f), glm::vec3(0.0f, 0.0f, 0.0f),
+                  glm::vec3(0.0f, 1.0f, 0.0f));
+  ubo.proj = glm::perspective(glm::radians(60.0f),
+                              static_cast<float>(swapchain.extent.width) /
+                                  static_cast<float>(swapchain.extent.height),
+                              1.0f, 100.0f);
+
+  // ユニフォームバッファをマップして更新します。
+  std::byte *pData;
+  VK_CHECK_RESULT(vkMapMemory(instance.device, uniform.memory, 0, sizeof(ubo),
+                              0, reinterpret_cast<void **>(&pData)));
+  std::memcpy(pData, &ubo, sizeof(ubo));
+  // データがコピーされたあとにマップを解除します。
+  // NOTE:ユニフォームバッファ用にホストコヒーレントメモリタイプをリクエストしたため、書き込みはGPUに即座に表示されます。
+  vkUnmapMemory(instance.device, uniform.memory);
 }

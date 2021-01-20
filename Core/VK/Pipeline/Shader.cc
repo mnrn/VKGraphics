@@ -25,10 +25,10 @@ ReadFile(const std::string &filename) {
   return std::move(buffer);
 }
 
-void Create(const Instance &instance, const std::string &filepath,
-            VkShaderStageFlagBits stage, VkSpecializationInfo *specialization,
-            std::vector<VkShaderModule> &modules,
-            std::vector<VkPipelineShaderStageCreateInfo> &stages) {
+VkPipelineShaderStageCreateInfo Create(const Instance &instance,
+                                       const std::string &filepath,
+                                       VkShaderStageFlagBits stage,
+                                       VkSpecializationInfo *specialization) {
   const auto v = ReadFile(filepath);
   if (std::holds_alternative<std::string>(v)) {
     std::cerr << std::get<std::string>(v) << std::endl;
@@ -54,7 +54,6 @@ void Create(const Instance &instance, const std::string &filepath,
   info.pName = SHADER_ENTRY_POINT;
   info.pSpecializationInfo = specialization;
 
-  modules.emplace_back(module);
-  stages.emplace_back(info);
+  return info;
 }
 } // namespace Shader

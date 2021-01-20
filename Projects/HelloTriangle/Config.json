@@ -3,10 +3,6 @@
   "Width": 1280,
   "Height": 720,
   "Samples": 0,
-  "Pipelines": [
-    {
-      "VertexShader": "./Assets/shaders/HLSL/SPIR-V/Basics/Basic.vs.spv",
-      "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Basics/Basic.fs.spv"
-    }
-  ]
+  "VertexShader": "./Assets/shaders/HLSL/SPIR-V/Basics/Basic.vs.spv",
+  "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Basics/Basic.fs.spv"
 }

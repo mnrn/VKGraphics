@@ -24,7 +24,7 @@ static inline GLFWwindow *Create(int w, int h, const char *title, int samples,
                                  GLFWmonitor *monitor = nullptr,
                                  GLFWwindow *share = nullptr) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
   if (samples > 0) {
     glfwWindowHint(GLFW_SAMPLES, samples);
@@ -34,7 +34,7 @@ static inline GLFWwindow *Create(int w, int h, const char *title, int samples,
   GLFWwindow *handle = glfwCreateWindow(w, h, title, monitor, share);
   if (handle == nullptr) {
     glfwTerminate();
-    BOOST_ASSERT_MSG(false, "Failed to create window!");
+    BOOST_ASSERT_MSG(handle != nullptr, "Failed to create window!");
     return nullptr;
   }
 

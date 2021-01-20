@@ -15,7 +15,6 @@
 #include <nlohmann/json.hpp>
 #include <memory>
 
-#include "Common.h"
 #include "VK/VkBase.h"
 #include "Window.h"
 

@@ -89,11 +89,7 @@ endfunction(buildAll)
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
 set(TARGETS
     #MinimalVK
-    #ListsLayers
-    #LoadValidationLayers
     HelloTriangle
-    UniformBuffers
-    TextureMapping
-    DepthTesting
+    #TextureMapping
     )
 buildAll()

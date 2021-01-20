@@ -8,6 +8,7 @@
 
 #include "ImageView.h"
 
+#include <VK/Common.h>
 #include <boost/assert.hpp>
 
 #include "VK/Instance.h"
@@ -33,9 +34,8 @@ VkImageView Create(const Instance &instance, VkImage image,
       (type == VK_IMAGE_VIEW_TYPE_CUBE) ? 6 : 1;
 
   VkImageView imageView;
-  if (vkCreateImageView(instance.device, &create, nullptr, &imageView)) {
-    BOOST_ASSERT_MSG(false, "Failed to create texture image view!");
-  }
+  VK_CHECK_RESULT(
+      vkCreateImageView(instance.device, &create, nullptr, &imageView));
   return imageView;
 }
 } // namespace ImageView

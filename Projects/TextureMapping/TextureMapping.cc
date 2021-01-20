@@ -77,7 +77,7 @@ void TextureMapping::OnUpdate(float t) {
 
 void TextureMapping::CreateRenderPass() {
   VkAttachmentDescription color{};
-  color.format = swapchain_.format;
+  color.format = swapchain.format;
   color.samples = VK_SAMPLE_COUNT_1_BIT;
   color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -115,7 +115,7 @@ void TextureMapping::CreateRenderPass() {
   create.dependencyCount = 1;
   create.pDependencies = &dependency;
 
-  if (vkCreateRenderPass(instance_.device, &create, nullptr, &renderPass_)) {
+  if (vkCreateRenderPass(instance.device, &create, nullptr, &renderPass)) {
     BOOST_ASSERT_MSG(false, "Failed to create render pass!");
   }
 }
@@ -145,14 +145,14 @@ void TextureMapping::CreateDescriptorSetLayouts() {
   create.bindingCount = static_cast<uint32_t>(binds.size());
   create.pBindings = binds.data();
 
-  if (vkCreateDescriptorSetLayout(instance_.device, &create, nullptr,
+  if (vkCreateDescriptorSetLayout(instance.device, &create, nullptr,
                                   &descriptors_.layout)) {
     BOOST_ASSERT_MSG(false, "Failed to create descriptor set layout!");
   }
 }
 
 void TextureMapping::DestroyDescriptorSetLayouts() {
-  vkDestroyDescriptorSetLayout(instance_.device, descriptors_.layout, nullptr);
+  vkDestroyDescriptorSetLayout(instance.device, descriptors_.layout, nullptr);
 }
 
 void TextureMapping::CreatePipelines() {
@@ -161,7 +161,7 @@ void TextureMapping::CreatePipelines() {
     create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     create.setLayoutCount = 1;
     create.pSetLayouts = &descriptors_.layout;
-    if (vkCreatePipelineLayout(instance_.device, &create, nullptr,
+    if (vkCreatePipelineLayout(instance.device, &create, nullptr,
                                &pipelines_.layout)) {
       BOOST_ASSERT_MSG(false, "Failed to create pipeline layout");
     }
@@ -173,10 +173,10 @@ void TextureMapping::CreatePipelines() {
 
     {
       const std::string &vs = pipeline["VertexShader"].get<std::string>();
-      Shader::Create(instance_, vs, VK_SHADER_STAGE_VERTEX_BIT, nullptr,
+      Shader::Create(instance, vs, VK_SHADER_STAGE_VERTEX_BIT, nullptr,
                      modules, stages);
       const std::string &fs = pipeline["FragmentShader"].get<std::string>();
-      Shader::Create(instance_, fs, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr,
+      Shader::Create(instance, fs, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr,
                      modules, stages);
     }
 
@@ -197,14 +197,14 @@ void TextureMapping::CreatePipelines() {
     VkViewport vp{};
     vp.x = 0.0f;
     vp.y = 0.0f;
-    vp.width = static_cast<float>(swapchain_.extent.width);
-    vp.height = static_cast<float>(swapchain_.extent.height);
+    vp.width = static_cast<float>(swapchain.extent.width);
+    vp.height = static_cast<float>(swapchain.extent.height);
     vp.minDepth = 0.0f;
     vp.maxDepth = 1.0f;
 
     VkRect2D sc{};
     sc.offset = {0, 0};
-    sc.extent = swapchain_.extent;
+    sc.extent = swapchain.extent;
 
     VkPipelineViewportStateCreateInfo vs{};
     vs.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -282,50 +282,50 @@ void TextureMapping::CreatePipelines() {
     create.pColorBlendState = &bs;
     create.pDynamicState = nullptr;
     create.layout = pipelines_.layout;
-    create.renderPass = renderPass_;
+    create.renderPass = renderPass;
     create.subpass = 0;
     create.basePipelineHandle = VK_NULL_HANDLE;
     create.basePipelineIndex = -1;
 
     VkPipeline handle;
-    if (vkCreateGraphicsPipelines(instance_.device, VK_NULL_HANDLE, 1, &create,
+    if (vkCreateGraphicsPipelines(instance.device, VK_NULL_HANDLE, 1, &create,
                                   nullptr, &handle)) {
       BOOST_ASSERT_MSG(false, "Failed to create graphics pipeline");
     }
     pipelines_.handles.emplace_back(handle);
     for (const auto &module : modules) {
-      vkDestroyShaderModule(instance_.device, module, nullptr);
+      vkDestroyShaderModule(instance.device, module, nullptr);
     }
   }
 }
 
-void TextureMapping::DestroyPipelines() { pipelines_.Destroy(instance_); }
+void TextureMapping::DestroyPipelines() { pipelines_.Destroy(instance); }
 
 void TextureMapping::CreateFramebuffers() {
-  framebuffers_.resize(swapchain_.views.size());
-  for (size_t i = 0; i < framebuffers_.size(); i++) {
-    std::vector<VkImageView> attachments = {swapchain_.views[i],
+  framebuffers.resize(swapchain.views.size());
+  for (size_t i = 0; i < framebuffers.size(); i++) {
+    std::vector<VkImageView> attachments = {swapchain.views[i],
                                             /* depthView */};
     VkFramebufferCreateInfo create{};
     create.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    create.renderPass = renderPass_;
+    create.renderPass = renderPass;
     create.attachmentCount = static_cast<uint32_t>(attachments.size());
     create.pAttachments = attachments.data();
-    create.width = swapchain_.extent.width;
-    create.height = swapchain_.extent.height;
+    create.width = swapchain.extent.width;
+    create.height = swapchain.extent.height;
     create.layers = 1;
-    if (vkCreateFramebuffer(instance_.device, &create, nullptr,
-                            &framebuffers_[i])) {
+    if (vkCreateFramebuffer(instance.device, &create, nullptr,
+                            &framebuffers[i])) {
       BOOST_ASSERT_MSG(false, "Failed to create framebuffer!");
     }
   }
 }
 
 void TextureMapping::SetupAssets() {
-  texture_.Create(instance_, "./Assets/Textures/SelfMade/star.png");
+  texture_.Create(instance, "./Assets/Textures/SelfMade/star.png");
 
   VkPhysicalDeviceProperties props{};
-  vkGetPhysicalDeviceProperties(instance_.physicalDevice, &props);
+  vkGetPhysicalDeviceProperties(instance.physicalDevice, &props);
 
   VkSamplerCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -342,30 +342,30 @@ void TextureMapping::SetupAssets() {
   create.compareOp = VK_COMPARE_OP_ALWAYS;
   create.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-  if (vkCreateSampler(instance_.device, &create, nullptr, &texture_.sampler)) {
+  if (vkCreateSampler(instance.device, &create, nullptr, &texture_.sampler)) {
     BOOST_ASSERT_MSG(false, "Failed to create texture sampler!");
   }
 }
 
-void TextureMapping::CleanupAssets() { texture_.Destroy(instance_); }
+void TextureMapping::CleanupAssets() { texture_.Destroy(instance); }
 
 void TextureMapping::CreateVertexBuffer() {
-  vertex_.Create(instance_, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+  vertex_.Create(instance, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 }
 
 void TextureMapping::CreateIndexBuffer() {
-  index_.Create(instance_, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+  index_.Create(instance, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
 void TextureMapping::CreateDrawCommandBuffers() {
-  commandBuffers_.draw.resize(framebuffers_.size());
+  commandBuffers_.draw.resize(framebuffers.size());
 
   VkCommandBufferAllocateInfo alloc{};
   alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc.commandPool = instance_.pool;
+  alloc.commandPool = instance.pool;
   alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   alloc.commandBufferCount = static_cast<uint32_t>(commandBuffers_.draw.size());
-  if (vkAllocateCommandBuffers(instance_.device, &alloc,
+  if (vkAllocateCommandBuffers(instance.device, &alloc,
                                commandBuffers_.draw.data())) {
     BOOST_ASSERT_MSG(false, "Failed to alloc draw command buffers!");
   }
@@ -382,10 +382,10 @@ void TextureMapping::CreateDrawCommandBuffers() {
 
     VkRenderPassBeginInfo render{};
     render.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render.renderPass = renderPass_;
-    render.framebuffer = framebuffers_[i];
+    render.renderPass = renderPass;
+    render.framebuffer = framebuffers[i];
     render.renderArea.offset = {0, 0};
-    render.renderArea.extent = swapchain_.extent;
+    render.renderArea.extent = swapchain.extent;
 
     std::array<VkClearValue, 1> clear{};
     clear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -419,10 +419,10 @@ void TextureMapping::CreateDrawCommandBuffers() {
 
 void TextureMapping::CreateUniformBuffers() {
   VkDeviceSize size = sizeof(UniformBufferObject);
-  uniforms_.resize(swapchain_.images.size());
+  uniforms_.resize(swapchain.images.size());
 
-  for (size_t i = 0; i < swapchain_.images.size(); i++) {
-    Buffer::Create(instance_, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  for (size_t i = 0; i < swapchain.images.size(); i++) {
+    Buffer::Create(instance, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                    uniforms_[i].buffer, uniforms_[i].memory);
@@ -430,8 +430,8 @@ void TextureMapping::CreateUniformBuffers() {
 }
 
 void TextureMapping::DestroyUniformBuffers() {
-  for (size_t i = 0; i < swapchain_.images.size(); i++) {
-    uniforms_[i].Destroy(instance_);
+  for (size_t i = 0; i < swapchain.images.size(); i++) {
+    uniforms_[i].Destroy(instance);
   }
 }
 
@@ -442,53 +442,53 @@ void TextureMapping::UpdateUniformBuffers(uint32_t imageIndex) {
       glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
                   glm::vec3(0.0f, 0.0f, 1.0f));
   ubo.proj = glm::perspective(glm::radians(45.0f),
-                              static_cast<float>(swapchain_.extent.width) /
-                                  static_cast<float>(swapchain_.extent.height),
+                              static_cast<float>(swapchain.extent.width) /
+                                  static_cast<float>(swapchain.extent.height),
                               0.1f, 10.0f);
   ubo.proj[1][1] *= -1;
 
   void *data;
-  vkMapMemory(instance_.device, uniforms_[imageIndex].memory, 0, sizeof(ubo), 0,
+  vkMapMemory(instance.device, uniforms_[imageIndex].memory, 0, sizeof(ubo), 0,
               &data);
   std::memcpy(data, &ubo, sizeof(ubo));
-  vkUnmapMemory(instance_.device, uniforms_[imageIndex].memory);
+  vkUnmapMemory(instance.device, uniforms_[imageIndex].memory);
 }
 
 void TextureMapping::CreateDescriptorPool() {
   std::array<VkDescriptorPoolSize, 2> sizes{};
   sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  sizes[0].descriptorCount = static_cast<uint32_t>(swapchain_.images.size());
+  sizes[0].descriptorCount = static_cast<uint32_t>(swapchain.images.size());
   sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  sizes[1].descriptorCount = static_cast<uint32_t>(swapchain_.images.size());
+  sizes[1].descriptorCount = static_cast<uint32_t>(swapchain.images.size());
 
   VkDescriptorPoolCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   create.poolSizeCount = static_cast<uint32_t>(sizes.size());
   create.pPoolSizes = sizes.data();
-  create.maxSets = static_cast<uint32_t>(swapchain_.images.size());
+  create.maxSets = static_cast<uint32_t>(swapchain.images.size());
 
-  if (vkCreateDescriptorPool(instance_.device, &create, nullptr,
-                             &descriptorPool_)) {
+  if (vkCreateDescriptorPool(instance.device, &create, nullptr,
+                             &descriptorPool)) {
     BOOST_ASSERT_MSG(false, "Failed to create descriptor pool!");
   }
 }
 
 void TextureMapping::CreateDescriptorSets() {
-  std::vector<VkDescriptorSetLayout> layouts(swapchain_.images.size(),
+  std::vector<VkDescriptorSetLayout> layouts(swapchain.images.size(),
                                              descriptors_.layout);
   VkDescriptorSetAllocateInfo alloc{};
   alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  alloc.descriptorPool = descriptorPool_;
-  alloc.descriptorSetCount = static_cast<uint32_t>(swapchain_.images.size());
+  alloc.descriptorPool = descriptorPool;
+  alloc.descriptorSetCount = static_cast<uint32_t>(swapchain.images.size());
   alloc.pSetLayouts = layouts.data();
 
-  descriptors_.handles.resize(swapchain_.images.size());
-  if (vkAllocateDescriptorSets(instance_.device, &alloc,
+  descriptors_.handles.resize(swapchain.images.size());
+  if (vkAllocateDescriptorSets(instance.device, &alloc,
                                descriptors_.handles.data())) {
     BOOST_ASSERT_MSG(false, "Failed to allocate descriptor sets!");
   }
 
-  for (size_t i = 0; i < swapchain_.images.size(); i++) {
+  for (size_t i = 0; i < swapchain.images.size(); i++) {
     VkDescriptorBufferInfo buffer{};
     buffer.buffer = uniforms_[i].buffer;
     buffer.offset = 0;
@@ -516,7 +516,7 @@ void TextureMapping::CreateDescriptorSets() {
     writes[1].descriptorCount = 1;
     writes[1].pImageInfo = &image;
 
-    vkUpdateDescriptorSets(instance_.device,
+    vkUpdateDescriptorSets(instance.device,
                            static_cast<uint32_t>(writes.size()), writes.data(),
                            0, nullptr);
   }

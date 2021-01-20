@@ -9,6 +9,7 @@
 
 #include "VK/Image/ImageView.h"
 #include "VK/Instance.h"
+#include "VK/Common.h"
 
 static VkSurfaceFormatKHR
 SelectSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &available) {
@@ -56,6 +57,8 @@ static VkExtent2D SelectSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
 
 void Swapchain::Create(const Instance &instance, int width, int height,
                        bool forceFifo) {
+  VkSwapchainKHR oldSwapchain = handle;
+
   VkSurfaceCapabilitiesKHR capabilities{};
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(instance.physicalDevice,
                                             instance.surface, &capabilities);
@@ -112,18 +115,26 @@ void Swapchain::Create(const Instance &instance, int width, int height,
   create.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   create.presentMode = presentMode;
   create.clipped = VK_TRUE;
-  create.oldSwapchain = VK_NULL_HANDLE;
+  create.oldSwapchain = oldSwapchain;
 
-  if (vkCreateSwapchainKHR(instance.device, &create, nullptr, &handle)) {
-    BOOST_ASSERT_MSG(false, "Failed to create swap chain!");
+  VK_CHECK_RESULT(vkCreateSwapchainKHR(instance.device, &create, nullptr, &handle));
+
+  // swapchainを再生成する場合、presentable imagesをすべて破棄します。
+  if (oldSwapchain != VK_NULL_HANDLE) {
+    for (auto& view : views) {
+      vkDestroyImageView(instance.device, view, nullptr);
+    }
+    vkDestroySwapchainKHR(instance.device, oldSwapchain, nullptr);
   }
 
+  // swapchain images を取得します。
   vkGetSwapchainImagesKHR(instance.device, handle, &imageCount, nullptr);
   images.resize(imageCount);
   vkGetSwapchainImagesKHR(instance.device, handle, &imageCount, images.data());
 
   format = surfaceFormat.format;
 
+  // swapchain buffers に含まれるimage viewを取得します。
   views.resize(imageCount);
   for (size_t i = 0; i < imageCount; i++) {
     views[i] = ImageView::Create(instance, images[i], VK_IMAGE_VIEW_TYPE_2D,

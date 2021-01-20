@@ -39,17 +39,17 @@ void Buffer::Create(const Instance &instance, VkDeviceSize size,
 
 void Buffer::Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
                   VkDeviceSize size) {
-  VkCommandBuffer command = Command::BeginSingleTime(instance);
+  VkCommandBuffer command = Command::Get(instance);
 
   VkBufferCopy copy{};
   copy.size = size;
   vkCmdCopyBuffer(command, src, dst, 1, &copy);
-  Command::EndSingleTime(instance, command);
+  Command::Flush(instance, command);
 }
 
 void Buffer::CopyToImage(const Instance &instance, VkBuffer buffer,
                          VkImage image, uint32_t width, uint32_t height) {
-  VkCommandBuffer command = Command::BeginSingleTime(instance);
+  VkCommandBuffer command = Command::Get(instance);
 
   VkBufferImageCopy copy{};
   copy.bufferOffset = 0;
@@ -64,7 +64,7 @@ void Buffer::CopyToImage(const Instance &instance, VkBuffer buffer,
 
   vkCmdCopyBufferToImage(command, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-  Command::EndSingleTime(instance, command);
+  Command::Flush(instance, command);
 }
 
 void Buffer::Destroy(const Instance &instance) const {

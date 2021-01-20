@@ -6,12 +6,41 @@
 
 #include <boost/assert.hpp>
 #include <iostream>
+#include <sstream>
 
 namespace Debug {
-static VKAPI_ATTR VkBool32 VKAPI_CALL Callback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT,
-    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *) {
-  std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+static VKAPI_ATTR VkBool32 VKAPI_CALL
+Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+         VkDebugUtilsMessageTypeFlagsEXT,
+         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *) {
+  // コールバックに渡されるフラグに応じてプレフィックスを選択します。
+  std::string prefix;
+  if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+    prefix = "VERBOSE: ";
+  } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+    prefix = "INFO: ";
+  } else if (messageSeverity &
+             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+    prefix = "WARNING: ";
+  } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    prefix = "ERROR: ";
+  }
+
+  // メッセージをデフォルト出力に表示します。
+  std::stringstream debugMessage;
+  debugMessage << prefix << "[" << pCallbackData->messageIdNumber << "]["
+               << pCallbackData->pMessageIdName
+               << "] : " << pCallbackData->pMessage;
+  if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    std::cerr << debugMessage.str() << std::endl;
+  } else {
+    std::cout << debugMessage.str() << std::endl;
+  }
+  fflush(stdout);
+
+  // このコールバックの戻り値は検証メッセージの原因となったVulkan呼び出しを中止するかどうかを制御します。
+  // ここでは、検証メッセージを中止させるVulkan呼び出しを望まないため、VK_FALSEを返します。
+  // 代わりに呼び出しを中止する場合は、VK_TRUEを渡すと、関数はVK_ERROR_VALIDATION_FAILED_EXTを返します。
   return VK_FALSE;
 }
 } // namespace Debug
@@ -50,9 +79,8 @@ void DebugMessenger::Destroy(VkInstance instance,
 
 void DebugMessenger::Setup(VkInstance instance) {
   VkDebugUtilsMessengerCreateInfoEXT info = ExtractCreateInfo();
-  if (Create(instance, &info, nullptr, &msg) != VK_SUCCESS) {
-    BOOST_ASSERT_MSG(false, "Failed to set up debug messenger");
-  }
+  VkResult result = Create(instance, &info, nullptr, &msg);
+  BOOST_ASSERT_MSG(result == VK_SUCCESS, "Failed to set up debug messenger");
 }
 
 void DebugMessenger::Cleanup(VkInstance instance) const {
