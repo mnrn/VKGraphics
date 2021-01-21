@@ -8,21 +8,20 @@
 
 #include "ImageView.h"
 
-#include <VK/Common.h>
 #include <boost/assert.hpp>
 
-#include "VK/Instance.h"
+#include "VK/Common.h"
+#include "VK/Device.h"
+#include "VK/Initializer.h"
 
 //*-----------------------------------------------------------------------------
 // Image View
 //*-----------------------------------------------------------------------------
 
 namespace ImageView {
-VkImageView Create(const Instance &instance, VkImage image,
-                   VkImageViewType type, VkFormat format,
-                   VkImageAspectFlags flags) {
-  VkImageViewCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+VkImageView Create(const Device &device, VkImage image, VkImageViewType type,
+                   VkFormat format, VkImageAspectFlags flags) {
+  VkImageViewCreateInfo create = Initializer::ImageViewCreateInfo();
   create.image = image;
   create.viewType = type;
   create.format = format;
@@ -34,8 +33,7 @@ VkImageView Create(const Instance &instance, VkImage image,
       (type == VK_IMAGE_VIEW_TYPE_CUBE) ? 6 : 1;
 
   VkImageView imageView;
-  VK_CHECK_RESULT(
-      vkCreateImageView(instance.device, &create, nullptr, &imageView));
+  VK_CHECK_RESULT(vkCreateImageView(device, &create, nullptr, &imageView));
   return imageView;
 }
 } // namespace ImageView

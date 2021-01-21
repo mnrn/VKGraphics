@@ -25,7 +25,7 @@
 class App : private boost::noncopyable {
 public:
   explicit App(const nlohmann::json &config) {
-    if (glfwInit() == GL_FALSE) {
+    if (glfwInit() == GLFW_FALSE) {
       BOOST_ASSERT_MSG(false, "glfw Initialization failed!");
     }
 

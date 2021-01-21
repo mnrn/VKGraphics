@@ -8,11 +8,9 @@
 #include <boost/assert.hpp>
 #include <vector>
 
-#include "VK/Buffer/Command.h"
-#include "VK/Buffer/Memory.h"
 #include "VK/Common.h"
 #include "VK/Initializer.h"
-#include "VK/Pipeline/Shader.h"
+#include "VK/Shader.h"
 
 //*-----------------------------------------------------------------------------
 // Constant expressions
@@ -48,19 +46,19 @@ void HelloTriangle::OnPostInit() {
 }
 
 void HelloTriangle::OnPreDestroy() {
-  vkDestroyBuffer(instance.device, uniform.buffer, nullptr);
-  vkFreeMemory(instance.device, uniform.memory, nullptr);
+  vkDestroyBuffer(device, uniform.buffer, nullptr);
+  vkFreeMemory(device, uniform.memory, nullptr);
 
-  vkDestroyBuffer(instance.device, indices.buffer, nullptr);
-  vkFreeMemory(instance.device, indices.memory, nullptr);
+  vkDestroyBuffer(device, indices.buffer, nullptr);
+  vkFreeMemory(device, indices.memory, nullptr);
 
-  vkDestroyBuffer(instance.device, vertices.buffer, nullptr);
-  vkFreeMemory(instance.device, vertices.memory, nullptr);
+  vkDestroyBuffer(device, vertices.buffer, nullptr);
+  vkFreeMemory(device, vertices.memory, nullptr);
 
-  vkDestroyDescriptorSetLayout(instance.device, descriptorSetLayout, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-  vkDestroyPipeline(instance.device, pipeline, nullptr);
-  vkDestroyPipelineLayout(instance.device, pipelineLayout, nullptr);
+  vkDestroyPipeline(device, pipeline, nullptr);
+  vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 }
 
 /**
@@ -156,16 +154,16 @@ void HelloTriangle::SetupDescriptorSetLayout() {
 
   VkDescriptorSetLayoutCreateInfo descriptorLayout =
       Initializer::DescriptorSetLayoutCreateInfo(&layoutBinding, 1);
-  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
-      instance.device, &descriptorLayout, nullptr, &descriptorSetLayout));
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout,
+                                              nullptr, &descriptorSetLayout));
 
   // この記述子セットレイアウトに基づくレンダリングパイプラインを生成するために使用されるパイプラインレイアウトを作成します。
   // より複雑なシナリオでは、再利用できる記述子セットのレイアウトごとに異なるパイプラインレイアウトがあります。
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
       Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
 
-  VK_CHECK_RESULT(vkCreatePipelineLayout(
-      instance.device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+  VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
+                                         nullptr, &pipelineLayout));
 }
 
 /**
@@ -252,12 +250,10 @@ void HelloTriangle::PreparePipelines() {
   vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
   std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
-  shaderStages[0] =
-      Shader::Create(instance, config["VertexShader"].get<std::string>(),
-                     VK_SHADER_STAGE_VERTEX_BIT);
-  shaderStages[1] =
-      Shader::Create(instance, config["FragmentShader"].get<std::string>(),
-                     VK_SHADER_STAGE_FRAGMENT_BIT);
+  shaderStages[0] = Shader::Create(config["VertexShader"].get<std::string>(),
+                                   device, VK_SHADER_STAGE_VERTEX_BIT);
+  shaderStages[1] = Shader::Create(config["FragmentShader"].get<std::string>(),
+                                   device, VK_SHADER_STAGE_FRAGMENT_BIT);
 
   // パイプラインシェーダーステージ情報を設定します。
   pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
@@ -274,13 +270,12 @@ void HelloTriangle::PreparePipelines() {
   pipelineCreateInfo.pDynamicState = &dynamicState;
 
   // 指定されたステートを使用してレンダリングパイプラインを作成します。
-  VK_CHECK_RESULT(vkCreateGraphicsPipelines(instance.device, pipelineCache, 1,
-                                            &pipelineCreateInfo, nullptr,
-                                            &pipeline));
+  VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+      device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
 
   // グラフィックスパイプラインを作成した後は、シェーダーモジュールは不要になります。
-  vkDestroyShaderModule(instance.device, shaderStages[0].module, nullptr);
-  vkDestroyShaderModule(instance.device, shaderStages[1].module, nullptr);
+  vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+  vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
 }
 
 void HelloTriangle::SetupDescriptorPool() {
@@ -292,8 +287,8 @@ void HelloTriangle::SetupDescriptorPool() {
   VkDescriptorPoolCreateInfo descriptorPoolInfo =
       Initializer::DescriptorPoolCreateInfo(1, &typeCount, 1);
 
-  VK_CHECK_RESULT(vkCreateDescriptorPool(instance.device, &descriptorPoolInfo,
-                                         nullptr, &descriptorPool));
+  VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
+                                         &descriptorPool));
 }
 
 void HelloTriangle::SetupDescriptorSet() {
@@ -302,15 +297,15 @@ void HelloTriangle::SetupDescriptorSet() {
       Initializer::DescriptorSetAllocateInfo(descriptorPool,
                                              &descriptorSetLayout, 1);
 
-  VK_CHECK_RESULT(vkAllocateDescriptorSets(
-      instance.device, &descriptorSetAllocateInfo, &descriptorSet));
+  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                                           &descriptorSet));
 
   // シェーダーバインディングポイントを決定する記述子セットを更新します。
   // シェーダーで使用されるすべてのバインディングポイントにはそのバインディングポイントに一致する記述子セットが必要です。
   VkWriteDescriptorSet writeDescriptorSet = Initializer::WriteDescriptorSet(
       descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniform.descriptor);
 
-  vkUpdateDescriptorSets(instance.device, 1, &writeDescriptorSet, 0, nullptr);
+  vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
 }
 
 //*-----------------------------------------------------------------------------
@@ -359,110 +354,87 @@ void HelloTriangle::PrepareVertices() {
   VkBufferCreateInfo vertexBufferCreateInfo = Initializer::BufferCreateInfo(
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT, vertexBufferSize);
   //頂点データをコピーするホストに表示されるバッファ(ステージングバッファ)を生成します。
-  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &vertexBufferCreateInfo,
-                                 nullptr, &(stagingBuffers.vertices.buffer)));
+  VK_CHECK_RESULT(vkCreateBuffer(device, &vertexBufferCreateInfo, nullptr,
+                                 &(stagingBuffers.vertices.buffer)));
 
   // データのコピーに使用できるホストの可視メモリタイプを要求します。
   // また、バッファのマッピングを解除した直後に書き込みがGPUに表示されるようにコヒーレント(干渉可能)であることを要求します。
   VkMemoryRequirements memoryRequirements{};
-  vkGetBufferMemoryRequirements(instance.device, stagingBuffers.vertices.buffer,
+  vkGetBufferMemoryRequirements(device, stagingBuffers.vertices.buffer,
                                 &memoryRequirements);
   VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
   memoryAllocateInfo.allocationSize = memoryRequirements.size;
-  if (const auto memoryType =
-          Memory::FindType(memoryRequirements.memoryTypeBits,
-                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                           instance.physicalDevice)) {
-    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
-  } else {
-    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
-  }
-  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
-                                   nullptr, &stagingBuffers.vertices.memory));
+  memoryAllocateInfo.memoryTypeIndex =
+      device.FindMemoryType(memoryRequirements.memoryTypeBits,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  VK_CHECK_RESULT(vkAllocateMemory(device, &memoryAllocateInfo, nullptr,
+                                   &stagingBuffers.vertices.memory));
 
   // マップしてコピーします。
   void *data;
-  VK_CHECK_RESULT(vkMapMemory(instance.device, stagingBuffers.vertices.memory,
-                              0, memoryAllocateInfo.allocationSize, 0, &data));
+  VK_CHECK_RESULT(vkMapMemory(device, stagingBuffers.vertices.memory, 0,
+                              memoryAllocateInfo.allocationSize, 0, &data));
   std::memcpy(data, vertexBuffer.data(), vertexBufferSize);
-  vkUnmapMemory(instance.device, stagingBuffers.vertices.memory);
-  VK_CHECK_RESULT(vkBindBufferMemory(instance.device,
-                                     stagingBuffers.vertices.buffer,
+  vkUnmapMemory(device, stagingBuffers.vertices.memory);
+  VK_CHECK_RESULT(vkBindBufferMemory(device, stagingBuffers.vertices.buffer,
                                      stagingBuffers.vertices.memory, 0));
 
   // (ホストローカル)頂点データがコピーされ、レンダリングに使用されるデバイスローカルバッファを生成します。
   vertexBufferCreateInfo.usage =
       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &vertexBufferCreateInfo,
-                                 nullptr, &vertices.buffer));
-  vkGetBufferMemoryRequirements(instance.device, vertices.buffer,
-                                &memoryRequirements);
+  VK_CHECK_RESULT(vkCreateBuffer(device, &vertexBufferCreateInfo, nullptr,
+                                 &vertices.buffer));
+  vkGetBufferMemoryRequirements(device, vertices.buffer, &memoryRequirements);
   memoryAllocateInfo.allocationSize = memoryRequirements.size;
-  if (const auto memoryType = Memory::FindType(
-          memoryRequirements.memoryTypeBits,
-          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance.physicalDevice)) {
-    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
-  } else {
-    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
-  }
-  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
-                                   nullptr, &vertices.memory));
+  memoryAllocateInfo.memoryTypeIndex = device.FindMemoryType(
+      memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   VK_CHECK_RESULT(
-      vkBindBufferMemory(instance.device, vertices.buffer, vertices.memory, 0));
+      vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &vertices.memory));
+  VK_CHECK_RESULT(
+      vkBindBufferMemory(device, vertices.buffer, vertices.memory, 0));
 
   // インデックスバッファ
   VkBufferCreateInfo indexBufferCreateInfo = Initializer::BufferCreateInfo(
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT, indexBufferSize);
 
   // インデックスデータをホストに表示されるバッファ(ステージングバッファ)にコピーします。
-  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &indexBufferCreateInfo,
-                                 nullptr, &stagingBuffers.indices.buffer));
-  vkGetBufferMemoryRequirements(instance.device, stagingBuffers.indices.buffer,
+  VK_CHECK_RESULT(vkCreateBuffer(device, &indexBufferCreateInfo, nullptr,
+                                 &stagingBuffers.indices.buffer));
+  vkGetBufferMemoryRequirements(device, stagingBuffers.indices.buffer,
                                 &memoryRequirements);
   memoryAllocateInfo.allocationSize = memoryRequirements.size;
-  if (const auto memoryType =
-          Memory::FindType(memoryRequirements.memoryTypeBits,
-                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                           instance.physicalDevice)) {
-    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
-  } else {
-    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
-  }
-  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
-                                   nullptr, &stagingBuffers.indices.memory));
-  VK_CHECK_RESULT(vkMapMemory(instance.device, stagingBuffers.indices.memory, 0,
+  memoryAllocateInfo.memoryTypeIndex =
+      device.FindMemoryType(memoryRequirements.memoryTypeBits,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  VK_CHECK_RESULT(vkAllocateMemory(device, &memoryAllocateInfo, nullptr,
+                                   &stagingBuffers.indices.memory));
+  VK_CHECK_RESULT(vkMapMemory(device, stagingBuffers.indices.memory, 0,
                               indexBufferSize, 0, &data));
   std::memcpy(data, indexBuffer.data(), indexBufferSize);
-  vkUnmapMemory(instance.device, stagingBuffers.indices.memory);
-  VK_CHECK_RESULT(vkBindBufferMemory(instance.device,
-                                     stagingBuffers.indices.buffer,
+  vkUnmapMemory(device, stagingBuffers.indices.memory);
+  VK_CHECK_RESULT(vkBindBufferMemory(device, stagingBuffers.indices.buffer,
                                      stagingBuffers.indices.memory, 0));
 
   // デバイス側のみ可視としバッファを生成します。
   indexBufferCreateInfo.usage =
       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &indexBufferCreateInfo,
-                                 nullptr, &indices.buffer));
-  vkGetBufferMemoryRequirements(instance.device, indices.buffer,
-                                &memoryRequirements);
-  memoryAllocateInfo.allocationSize = memoryRequirements.size;
-  if (const auto memoryType = Memory::FindType(
-          memoryRequirements.memoryTypeBits,
-          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance.physicalDevice)) {
-    memoryAllocateInfo.memoryTypeIndex = memoryType.value();
-  } else {
-    BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
-  }
-  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
-                                   nullptr, &indices.memory));
   VK_CHECK_RESULT(
-      vkBindBufferMemory(instance.device, indices.buffer, indices.memory, 0));
+      vkCreateBuffer(device, &indexBufferCreateInfo, nullptr, &indices.buffer));
+  vkGetBufferMemoryRequirements(device, indices.buffer, &memoryRequirements);
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  memoryAllocateInfo.memoryTypeIndex = device.FindMemoryType(
+      memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  VK_CHECK_RESULT(
+      vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &indices.memory));
+  VK_CHECK_RESULT(
+      vkBindBufferMemory(device, indices.buffer, indices.memory, 0));
 
   // バッファコピーはキューに送信する必要があるため、それらのコマンドバッファが必要です。
   // NOTE:一部のデバイスは、大量のコピーを実行する場合に高速になる可能性がある専用の転送キュー(転送ビットのみが設定されている)を提供します。
-  VkCommandBuffer copyCmd = Command::Get(instance);
+  VkCommandBuffer copyCmd =
+      device.CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
   // バッファ領域のコピーをコマンドバッファに代入します。
   VkBufferCopy copyRegion{};
@@ -478,14 +450,14 @@ void HelloTriangle::PrepareVertices() {
                   &copyRegion);
 
   // コマンドバッファをフラッシュすると、それもキューに送信され、フェンスを使用して、戻る前にすべてのコマンドが実行されたことを確認します。
-  Command::Flush(instance, copyCmd);
+  device.FlushCommandBuffer(copyCmd, queue);
 
   // ステージングバッファを破棄します。
   // NOTE:コピーを送信して実行する前に、ステージングバッファを削除しないでください。
-  vkDestroyBuffer(instance.device, stagingBuffers.vertices.buffer, nullptr);
-  vkFreeMemory(instance.device, stagingBuffers.vertices.memory, nullptr);
-  vkDestroyBuffer(instance.device, stagingBuffers.indices.buffer, nullptr);
-  vkFreeMemory(instance.device, stagingBuffers.indices.memory, nullptr);
+  vkDestroyBuffer(device, stagingBuffers.vertices.buffer, nullptr);
+  vkFreeMemory(device, stagingBuffers.vertices.memory, nullptr);
+  vkDestroyBuffer(device, stagingBuffers.indices.buffer, nullptr);
+  vkFreeMemory(device, stagingBuffers.indices.memory, nullptr);
 }
 
 /**
@@ -499,29 +471,25 @@ void HelloTriangle::PrepareUniformBuffers() {
   VkBufferCreateInfo bufferCreateInfo = Initializer::BufferCreateInfo(
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(UniformBufferObject));
   // 新しいバッファを作成します。
-  VK_CHECK_RESULT(vkCreateBuffer(instance.device, &bufferCreateInfo, nullptr,
-                                 &uniform.buffer));
+  VK_CHECK_RESULT(
+      vkCreateBuffer(device, &bufferCreateInfo, nullptr, &uniform.buffer));
 
   // サイズ、配置、メモリタイプなどのメモリ要件を取得します。
   VkMemoryRequirements memReqs;
-  vkGetBufferMemoryRequirements(instance.device, uniform.buffer, &memReqs);
+  vkGetBufferMemoryRequirements(device, uniform.buffer, &memReqs);
 
   VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
   memoryAllocateInfo.allocationSize = memReqs.size;
-  const auto memoryType =
-      Memory::FindType(memReqs.memoryTypeBits,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                       instance.physicalDevice);
-  BOOST_ASSERT_MSG(memoryType, "Failed to find suitable memory type!");
-  memoryAllocateInfo.memoryTypeIndex = memoryType.value();
+  memoryAllocateInfo.memoryTypeIndex = device.FindMemoryType(
+      memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
   // ユニフォームバッファをメモリに割り当てます。
-  VK_CHECK_RESULT(vkAllocateMemory(instance.device, &memoryAllocateInfo,
-                                   nullptr, &(uniform.memory)));
+  VK_CHECK_RESULT(vkAllocateMemory(device, &memoryAllocateInfo, nullptr,
+                                   &(uniform.memory)));
   // メモリをバッファにバインドします。
   VK_CHECK_RESULT(
-      vkBindBufferMemory(instance.device, uniform.buffer, uniform.memory, 0));
+      vkBindBufferMemory(device, uniform.buffer, uniform.memory, 0));
 
   // 記述子セットで使用されるユニフォームの記述子に情報を格納します。
   uniform.descriptor.buffer = uniform.buffer;
@@ -549,10 +517,10 @@ void HelloTriangle::UpdateUniformBuffers() {
 
   // ユニフォームバッファをマップして更新します。
   std::byte *pData;
-  VK_CHECK_RESULT(vkMapMemory(instance.device, uniform.memory, 0, sizeof(ubo),
-                              0, reinterpret_cast<void **>(&pData)));
+  VK_CHECK_RESULT(vkMapMemory(device, uniform.memory, 0, sizeof(ubo), 0,
+                              reinterpret_cast<void **>(&pData)));
   std::memcpy(pData, &ubo, sizeof(ubo));
   // データがコピーされたあとにマップを解除します。
   // NOTE:ユニフォームバッファ用にホストコヒーレントメモリタイプをリクエストしたため、書き込みはGPUに即座に表示されます。
-  vkUnmapMemory(instance.device, uniform.memory);
+  vkUnmapMemory(device, uniform.memory);
 }

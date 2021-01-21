@@ -1,10 +1,4 @@
-#include "VK/Buffer/Buffer.h"
-
-#include <boost/assert.hpp>
-
-#include "VK/Buffer/Command.h"
-#include "VK/Buffer/Memory.h"
-#include "VK/Instance.h"
+/*
 
 void Buffer::Create(const Instance &instance, VkDeviceSize size,
                     VkBufferUsageFlags usage, VkMemoryPropertyFlags memProp,
@@ -62,7 +56,8 @@ void Buffer::CopyToImage(const Instance &instance, VkBuffer buffer,
   copy.imageOffset = {0, 0, 0};
   copy.imageExtent = { width, height, 1};
 
-  vkCmdCopyBufferToImage(command, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+  vkCmdCopyBufferToImage(command, buffer, image,
+VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
   Command::Flush(instance, command);
 }
@@ -75,3 +70,5 @@ void Buffer::Destroy(const Instance &instance) const {
     vkFreeMemory(instance.device, memory, nullptr);
   }
 }
+
+ */

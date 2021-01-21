@@ -6,6 +6,25 @@
 
 namespace Initializer {
 
+[[maybe_unused]] inline VkDeviceQueueCreateInfo DeviceQueueCreateInfo() {
+  VkDeviceQueueCreateInfo deviceQueueCreateInfo{};
+  deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  return deviceQueueCreateInfo;
+}
+
+[[maybe_unused]] inline VkDeviceQueueCreateInfo
+DeviceQueueCreateInfo(uint32_t queueFamilyIndex, uint32_t queueCount,
+                      const float *pQueuePriorities,
+                      VkDeviceQueueCreateFlags flags = 0) {
+  VkDeviceQueueCreateInfo deviceQueueCreateInfo{};
+  deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  deviceQueueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+  deviceQueueCreateInfo.queueCount = queueCount;
+  deviceQueueCreateInfo.pQueuePriorities = pQueuePriorities;
+  deviceQueueCreateInfo.flags = flags;
+  return deviceQueueCreateInfo;
+}
+
 [[maybe_unused]] inline VkMemoryAllocateInfo MemoryAllocateInfo() {
   VkMemoryAllocateInfo memoryAllocateInfo{};
   memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -52,6 +71,47 @@ CommandBufferAllocateInfo(VkCommandPool cmdPool, VkCommandBufferLevel level,
   VkRenderPassCreateInfo renderPassCreateInfo{};
   renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
   return renderPassCreateInfo;
+}
+
+[[maybe_unused]] inline VkImageMemoryBarrier ImageMemoryBarrier() {
+  VkImageMemoryBarrier imageMemoryBarrier{};
+  imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  return imageMemoryBarrier;
+}
+
+[[maybe_unused]] inline VkBufferMemoryBarrier BufferMemoryBarrier() {
+  VkBufferMemoryBarrier bufferMemoryBarrier{};
+  bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  return bufferMemoryBarrier;
+}
+
+[[maybe_unused]] inline VkMemoryBarrier MemoryBarrier() {
+  VkMemoryBarrier memoryBarrier{};
+  memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+  return memoryBarrier;
+}
+
+[[maybe_unused]] inline VkImageCreateInfo ImageCreateInfo() {
+  VkImageCreateInfo imageCreateInfo{};
+  imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  return imageCreateInfo;
+}
+
+[[maybe_unused]] inline VkSamplerCreateInfo SamplerCreateInfo() {
+  VkSamplerCreateInfo samplerCreateInfo{};
+  samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  samplerCreateInfo.maxAnisotropy = 1.0f;
+  return samplerCreateInfo;
+}
+
+[[maybe_unused]] inline VkImageViewCreateInfo ImageViewCreateInfo() {
+  VkImageViewCreateInfo imageViewCreateInfo{};
+  imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  return imageViewCreateInfo;
 }
 
 [[maybe_unused]] inline VkFramebufferCreateInfo FramebufferCreateInfo() {

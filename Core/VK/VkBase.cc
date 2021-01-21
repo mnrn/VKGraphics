@@ -17,6 +17,8 @@
 #include "VK/Common.h"
 #include "VK/Initializer.h"
 #include "VK/Utils.h"
+#include "VK/Image/Image.h"
+#include "VK/Image/ImageView.h"
 
 //*-----------------------------------------------------------------------------
 // Init & Deinit
@@ -30,11 +32,16 @@ void VkBase::OnInit(const nlohmann::json &conf, GLFWwindow *hwnd) {
 
   CreateInstance(appName.c_str());
 #if !defined(NDEBUG)
-  debug_.Setup(instance.Get());
+  debugMessenger.Setup(instance);
 #endif
-  CreateSurface();
-  SelectPhysicalDevice();
-  CreateLogicalDevice();
+  VkPhysicalDevice physicalDevice = SelectPhysicalDevice();
+  swapchain.Init(instance, window, physicalDevice);
+  device.Init(physicalDevice);
+  VK_CHECK_RESULT(device.CreateLogicalDevice(GetEnabledFeatures(),
+                                             GetEnabledDeviceExtensions()));
+
+  // デバイスからグラフィックスキューを取得します。
+  vkGetDeviceQueue(device, device.queueFamilyIndices.graphics, 0, &queue);
   CreateSemaphores();
 
   OnPostInit();
@@ -60,26 +67,27 @@ void VkBase::OnPreDestroy() {}
 void VkBase::OnDestroy() {
   OnPreDestroy();
 
-  swapchain.Destroy(instance);
+  swapchain.Destroy(instance, device);
   if (descriptorPool != VK_NULL_HANDLE) {
-    vkDestroyDescriptorPool(instance.device, descriptorPool, nullptr);
+    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
   }
   DestroyCommandBuffers();
-  vkDestroyRenderPass(instance.device, renderPass, nullptr);
+  vkDestroyRenderPass(device, renderPass, nullptr);
   for (auto &framebuffer : framebuffers) {
-    vkDestroyFramebuffer(instance.device, framebuffer, nullptr);
+    vkDestroyFramebuffer(device, framebuffer, nullptr);
   }
 
-  depthStencil.Destroy(instance);
+  DestroyDepthStencil();
 
-  vkDestroyPipelineCache(instance.device, pipelineCache, nullptr);
-  vkDestroyCommandPool(instance.device, instance.pool, nullptr);
+  vkDestroyPipelineCache(device, pipelineCache, nullptr);
+  vkDestroyCommandPool(device, cmdPool, nullptr);
   DestroySyncObjects();
 
+  device.Destroy();
 #if !defined(NDEBUG)
-  debug_.Cleanup(instance.Get());
+  debugMessenger.Cleanup(instance);
 #endif
-  instance.Destroy();
+  vkDestroyInstance(instance, nullptr);
 }
 
 //*-----------------------------------------------------------------------------
@@ -98,16 +106,14 @@ void VkBase::RenderFrame() {
   VkBase::PrepareFrame();
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-  VK_CHECK_RESULT(
-      vkQueueSubmit(instance.queues.graphics, 1, &submitInfo, VK_NULL_HANDLE));
+  VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
   VkBase::SubmitFrame();
 }
 
 void VkBase::PrepareFrame() {
   // スワップチェーンの次の画像を取得します。(バック/フロントバッファ)
-  VkResult result = vkAcquireNextImageKHR(
-      instance.device, swapchain.Get(), std::numeric_limits<uint64_t>::max(),
-      semaphores.presentComplete, VK_NULL_HANDLE, &currentBuffer);
+  VkResult result = swapchain.AcquiredNextImage(
+      device, semaphores.presentComplete, &currentBuffer);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     ResizeWindow();
     return;
@@ -117,32 +123,20 @@ void VkBase::PrepareFrame() {
 }
 
 void VkBase::SubmitFrame() {
-  VkPresentInfoKHR present{};
-  present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  present.swapchainCount = 1;
-  present.pSwapchains = &swapchain.Get();
-  present.pImageIndices = &currentBuffer;
-  if (semaphores.renderComplete) {
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &semaphores.renderComplete;
-  }
-
-  // 現在のバッファをスワップチェーンに提示します。
-  // コマンドバッファ送信によって通知されたセマフォを送信情報からスワップチェーンプレゼンテーションの待機セマフォとして渡します。
-  // これにより、すべてのコマンドが送信されるまで、画像がウィンドウシステムに表示されないようになります。
-  VkResult result = vkQueuePresentKHR(instance.queues.presentation, &present);
+  VkResult result =
+      swapchain.QueuePresent(queue, currentBuffer, semaphores.renderComplete);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
-      isFramebufferResized_) {
-    isFramebufferResized_ = false;
+      isFramebufferResized) {
+    isFramebufferResized = false;
     ResizeWindow();
     return;
   } else {
     VK_CHECK_RESULT(result);
   }
-  VK_CHECK_RESULT(vkQueueWaitIdle(instance.queues.presentation));
+  VK_CHECK_RESULT(vkQueueWaitIdle(queue));
 }
 
-void VkBase::WaitIdle() const { vkDeviceWaitIdle(instance.device); }
+void VkBase::WaitIdle() const { vkDeviceWaitIdle(device); }
 
 //*-----------------------------------------------------------------------------
 // Resize window
@@ -150,7 +144,7 @@ void VkBase::WaitIdle() const { vkDeviceWaitIdle(instance.device); }
 
 void VkBase::OnResized(GLFWwindow *window, int, int) {
   auto app = reinterpret_cast<VkBase *>(glfwGetWindowUserPointer(window));
-  app->isFramebufferResized_ = true;
+  app->isFramebufferResized = true;
 }
 
 void VkBase::ResizeWindow() {
@@ -164,16 +158,16 @@ void VkBase::ResizeWindow() {
   }
 
   // リソースを破棄する前にDeviceがすべての作業を終わらせている必要があります。
-  vkDeviceWaitIdle(instance.device);
+  vkDeviceWaitIdle(device);
 
   // Swap chain の再生成を行います。
-  swapchain.Create(instance, width, height);
+  swapchain.Create(device, width, height);
 
   // Frame buffers の再生成を行います。
-  depthStencil.Destroy(instance);
-  depthStencil.Create(instance, swapchain);
+  DestroyDepthStencil();
+  SetupDepthStencil();
   for (auto &framebuffer : framebuffers) {
-    vkDestroyFramebuffer(instance.device, framebuffer, nullptr);
+    vkDestroyFramebuffer(device, framebuffer, nullptr);
   }
   SetupFramebuffers();
 
@@ -182,7 +176,7 @@ void VkBase::ResizeWindow() {
   CreateCommandBuffers();
   BuildCommandBuffers();
 
-  vkDeviceWaitIdle(instance.device);
+  vkDeviceWaitIdle(device);
 
   ViewChanged();
 }
@@ -227,107 +221,49 @@ void VkBase::CreateInstance(const char *appName) {
     create.enabledLayerCount = 0;
   }
 
-  if (vkCreateInstance(&create, nullptr, instance.Set())) {
-    BOOST_ASSERT_MSG(false, "Failed to create instance!");
-  }
+  VK_CHECK_RESULT(vkCreateInstance(&create, nullptr, &instance));
 }
 
-void VkBase::CreateSurface() {
-  if (glfwCreateWindowSurface(instance.Get(), window, nullptr,
-                              &instance.surface)) {
-    BOOST_ASSERT_MSG(false, "Failed to create window surface!");
-  }
-}
-
-void VkBase::SelectPhysicalDevice() {
+VkPhysicalDevice VkBase::SelectPhysicalDevice() const {
   uint32_t size = 0;
-  vkEnumeratePhysicalDevices(instance.Get(), &size, nullptr);
+  vkEnumeratePhysicalDevices(instance, &size, nullptr);
   BOOST_ASSERT_MSG(size != 0, "Failed to find any physical device!");
 
   std::vector<VkPhysicalDevice> devices(size);
-  vkEnumeratePhysicalDevices(instance.Get(), &size, devices.data());
+  vkEnumeratePhysicalDevices(instance, &size, devices.data());
 #if !defined(NDEBUG)
   spdlog::info("Found {} physical devices", size);
 #endif
   std::multimap<float, VkPhysicalDevice> scores;
-  for (const auto &device : devices) {
-    scores.emplace(
-        Utils::CalcDeviceScore(device, instance.surface, deviceExtensions_),
-        device);
+  for (const auto &dev : devices) {
+    scores.emplace(CalcDeviceScore(dev, GetEnabledDeviceExtensions()),
+                   dev);
   }
   BOOST_ASSERT_MSG(scores.rbegin()->first >= 0.0000001f,
                    "Failed to find suitable physical device");
 
-  instance.physicalDevice = scores.rbegin()->second;
-  vkGetPhysicalDeviceProperties(instance.physicalDevice, &instance.properties);
-}
-
-void VkBase::CreateLogicalDevice() {
-  QueueFamilies families = QueueFamilies::Find(instance);
-
-  std::vector<VkDeviceQueueCreateInfo> createQueues;
-  float priority = 1.0f;
-  for (int family : families.UniqueFamilies()) {
-    VkDeviceQueueCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    create.queueFamilyIndex = static_cast<uint32_t>(family);
-    create.queueCount = 1;
-    create.pQueuePriorities = &priority;
-    createQueues.emplace_back(create);
-  }
-
-  VkPhysicalDeviceFeatures features{};
-  features.samplerAnisotropy = VK_TRUE;
-
-  VkDeviceCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  create.queueCreateInfoCount = static_cast<uint32_t>(createQueues.size());
-  create.pQueueCreateInfos = createQueues.data();
-  create.enabledExtensionCount =
-      static_cast<uint32_t>(deviceExtensions_.size());
-  create.ppEnabledExtensionNames = deviceExtensions_.data();
-  create.pEnabledFeatures = &features;
-  if (isEnableValidationLayers_) {
-    create.enabledLayerCount = static_cast<uint32_t>(validationLayers_.size());
-    create.ppEnabledLayerNames = validationLayers_.data();
-  } else {
-    create.enabledLayerCount = 0;
-  }
-
-  if (vkCreateDevice(instance.physicalDevice, &create, nullptr,
-                     &instance.device)) {
-    BOOST_ASSERT_MSG(false, "Failed to create logical device");
-  }
-
-  vkGetDeviceQueue(instance.device, static_cast<uint32_t>(families.graphics), 0,
-                   &instance.queues.graphics);
-  vkGetDeviceQueue(instance.device,
-                   static_cast<uint32_t>(families.presentation), 0,
-                   &instance.queues.presentation);
+  return scores.rbegin()->second;
 }
 
 //*-----------------------------------------------------------------------------
 // Vulkan Fixed functions
 //*-----------------------------------------------------------------------------
 
-void VkBase::CreateSwapchain(int w, int h) { swapchain.Create(instance, w, h); }
+void VkBase::CreateSwapchain(int w, int h) { swapchain.Create(device, w, h); }
 
 void VkBase::CreatePipelineCache() {
   VkPipelineCacheCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
   VK_CHECK_RESULT(
-      vkCreatePipelineCache(instance.device, &create, nullptr, &pipelineCache));
+      vkCreatePipelineCache(device, &create, nullptr, &pipelineCache));
 }
 
 void VkBase::CreateCommandPool() {
-  QueueFamilies families = QueueFamilies::Find(instance);
-
   VkCommandPoolCreateInfo create{};
   create.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  create.queueFamilyIndex = static_cast<uint32_t>(families.graphics);
+  create.queueFamilyIndex = swapchain.queueFamilyIndex;
   create.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  VK_CHECK_RESULT(
-      vkCreateCommandPool(instance.device, &create, nullptr, &instance.pool));
+  VK_CHECK_RESULT(vkCreateCommandPool(device, &create, nullptr, &cmdPool));
 }
 
 void VkBase::CreateCommandBuffers() {
@@ -335,15 +271,15 @@ void VkBase::CreateCommandBuffers() {
 
   VkCommandBufferAllocateInfo alloc{};
   alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc.commandPool = instance.pool;
+  alloc.commandPool = cmdPool;
   alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   alloc.commandBufferCount = static_cast<uint32_t>(drawCmdBuffers.size());
   VK_CHECK_RESULT(
-      vkAllocateCommandBuffers(instance.device, &alloc, drawCmdBuffers.data()));
+      vkAllocateCommandBuffers(device, &alloc, drawCmdBuffers.data()));
 }
 
 void VkBase::DestroyCommandBuffers() {
-  vkFreeCommandBuffers(instance.device, instance.pool,
+  vkFreeCommandBuffers(device, cmdPool,
                        static_cast<uint32_t>(drawCmdBuffers.size()),
                        drawCmdBuffers.data());
 }
@@ -351,10 +287,10 @@ void VkBase::DestroyCommandBuffers() {
 void VkBase::CreateSemaphores() {
   VkSemaphoreCreateInfo semaphoreCreateInfo =
       Initializer::SemaphoreCreateInfo();
-  VK_CHECK_RESULT(vkCreateSemaphore(instance.device, &semaphoreCreateInfo,
-                                    nullptr, &semaphores.presentComplete));
-  VK_CHECK_RESULT(vkCreateSemaphore(instance.device, &semaphoreCreateInfo,
-                                    nullptr, &semaphores.renderComplete));
+  VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
+                                    &semaphores.presentComplete));
+  VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
+                                    &semaphores.renderComplete));
 
   submitInfo = Initializer::SubmitInfo();
   submitInfo.pWaitDstStageMask = &submitPipelineStages;
@@ -369,16 +305,22 @@ void VkBase::CreateFence() {
       Initializer::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
   waitFences.resize(drawCmdBuffers.size());
   for (auto &fence : waitFences) {
-    VK_CHECK_RESULT(vkCreateFence(instance.device, &create, nullptr, &fence));
+    VK_CHECK_RESULT(vkCreateFence(device, &create, nullptr, &fence));
   }
 }
 
 void VkBase::DestroySyncObjects() {
   for (auto &fence : waitFences) {
-    vkDestroyFence(instance.device, fence, nullptr);
+    vkDestroyFence(device, fence, nullptr);
   }
-  vkDestroySemaphore(instance.device, semaphores.renderComplete, nullptr);
-  vkDestroySemaphore(instance.device, semaphores.presentComplete, nullptr);
+  vkDestroySemaphore(device, semaphores.renderComplete, nullptr);
+  vkDestroySemaphore(device, semaphores.presentComplete, nullptr);
+}
+
+void VkBase::DestroyDepthStencil() {
+  vkDestroyImageView(device, depthStencil.view, nullptr);
+  vkDestroyImage(device, depthStencil.image, nullptr);
+  vkFreeMemory(device, depthStencil.memory, nullptr);
 }
 
 //*-----------------------------------------------------------------------------
@@ -388,7 +330,15 @@ void VkBase::DestroySyncObjects() {
 /**
  * @brief フレームバッファで使用される深度(ステンシル)バッファを生成します。
  */
-void VkBase::SetupDepthStencil() { depthStencil.Create(instance, swapchain); }
+void VkBase::SetupDepthStencil() {
+  const auto depthFormat = device.FindSupportedDepthFormat();
+  Image::Create(device, swapchain.extent.width, swapchain.extent.height, 0,
+                depthFormat, VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthStencil.image, depthStencil.memory);
+  depthStencil.view = ImageView::Create(device, depthStencil.image, VK_IMAGE_VIEW_TYPE_2D,
+                           depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+}
 
 /**
  * @brief スワップチェーンのイメージごとにフレームバッファを生成します。
@@ -411,8 +361,8 @@ void VkBase::SetupFramebuffers() {
   framebuffers.resize(swapchain.views.size());
   for (size_t i = 0; i < framebuffers.size(); i++) {
     attachments[0] = swapchain.views[i];
-    VK_CHECK_RESULT(vkCreateFramebuffer(instance.device, &create, nullptr,
-                                        &framebuffers[i]));
+    VK_CHECK_RESULT(
+        vkCreateFramebuffer(device, &create, nullptr, &framebuffers[i]));
   }
 }
 
@@ -439,12 +389,7 @@ void VkBase::SetupRenderPass() {
 
   // デプスアタッチメント
   VkAttachmentDescription depth{};
-  if (const auto format =
-          DepthStencil::FindDepthFormat(instance.physicalDevice)) {
-    depth.format = format.value();
-  } else {
-    BOOST_ASSERT_MSG(format, "Failed to find suitable depth format!");
-  }
+  depth.format = device.FindSupportedDepthFormat();
   depth.samples = VK_SAMPLE_COUNT_1_BIT;
   depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -516,10 +461,18 @@ void VkBase::SetupRenderPass() {
   create.dependencyCount = static_cast<uint32_t>(dependencies.size());
   create.pDependencies = dependencies.data();
 
-  VK_CHECK_RESULT(
-      vkCreateRenderPass(instance.device, &create, nullptr, &renderPass));
+  VK_CHECK_RESULT(vkCreateRenderPass(device, &create, nullptr, &renderPass));
 }
 
 void VkBase::BuildCommandBuffers() {}
 
 void VkBase::ViewChanged() {}
+
+VkPhysicalDeviceFeatures VkBase::GetEnabledFeatures() const {
+  VkPhysicalDeviceFeatures enabledFeatures{};
+  return enabledFeatures;
+}
+
+std::vector<const char *> VkBase::GetEnabledDeviceExtensions() const {
+  return {};
+}

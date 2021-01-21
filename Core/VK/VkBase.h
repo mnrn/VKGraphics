@@ -14,10 +14,8 @@
 
 #include <GLFW/glfw3.h>
 
-#include "VK/Buffer/Buffer.h"
-#include "VK/Buffer/DepthStencil.h"
 #include "VK/Debug.h"
-#include "VK/Instance.h"
+#include "VK/Device.h"
 #include "VK/Swapchain.h"
 
 class VkBase : private boost::noncopyable {
@@ -36,9 +34,6 @@ public:
 
 protected:
   void CreateInstance(const char *appName);
-  void CreateSurface();
-  void SelectPhysicalDevice();
-  void CreateLogicalDevice();
 
   virtual void OnPostInit();
   virtual void OnPreDestroy();
@@ -62,56 +57,69 @@ protected:
   void RenderFrame();
   void SubmitFrame();
 
+  void DestroyDepthStencil();
+
   virtual void ResizeWindow();
   virtual void ViewChanged();
+  [[nodiscard]] virtual VkPhysicalDeviceFeatures GetEnabledFeatures() const;
+  [[nodiscard]] virtual std::vector<const char *>
+  GetEnabledDeviceExtensions() const;
+  [[nodiscard]] virtual VkPhysicalDevice SelectPhysicalDevice() const;
 
-  // Vulkan Instance
-  Instance instance{};
-  // Swap chain to present images (framebuffers) to the windowing system
+  VkInstance instance = VK_NULL_HANDLE;
+  Device device{};
+  VkQueue queue = VK_NULL_HANDLE;
+
+  /** @brief Swap chain to present images (framebuffers) to the windowing system
+   */
   Swapchain swapchain{};
+  /** @brief コマンドバッファプール */
+  VkCommandPool cmdPool = VK_NULL_HANDLE;
+  /** @brief 記述子セットプール */
   VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-  // フレームバッファに書き込むグローバルレンダーパス
+  /** @brief フレームバッファに書き込むグローバルレンダーパス */
   VkRenderPass renderPass = VK_NULL_HANDLE;
-  // レンダリングに使用されるコマンドバッファ
+  /** @brief レンダリングに使用されるコマンドバッファ */
   std::vector<VkCommandBuffer> drawCmdBuffers{};
-  // 使用可能なフレームバッファのリスト(スワップチェーンイメージの数と同じになります。)
+  /** @brief 使用可能なフレームバッファのリスト */
   std::vector<VkFramebuffer> framebuffers{};
-  // 現在使用しているフレームバッファのインデックス
+  /** @brief 現在使用しているフレームバッファのインデックス */
   uint32_t currentBuffer = 0;
-  // 同期セマフォ
+  /** @brief  同期セマフォ */
   struct {
-    // swap chain imagesの表示を交換します。
+    /** @brief swap chain image presentation */
     VkSemaphore presentComplete = VK_NULL_HANDLE;
-    // コマンドバッファの送信と実行に用います。
+    /** @brief コマンドバッファの送信と実行に用います。 */
     VkSemaphore renderComplete = VK_NULL_HANDLE;
   } semaphores{};
   std::vector<VkFence> waitFences{};
-  // キューに提示されるコマンドバッファとセマフォが含まれます。
-  VkSubmitInfo submitInfo;
-  // グラフィックキューの送信を待機するために使用されるパイプラインステージ
+  /** @brief キューに提示されるコマンドバッファとセマフォが含まれます。*/
+  VkSubmitInfo submitInfo{};
+  /** @brief
+   * グラフィックキューの送信を待機するために使用されるパイプラインステージ */
   VkPipelineStageFlags submitPipelineStages =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  // Pipeline cache object
+  /** @brief Pipeline cache object */
   VkPipelineCache pipelineCache = VK_NULL_HANDLE;
-  // Depth stencil object
-  DepthStencil depthStencil;
+  /** @brief Depth stencil object */
+  struct {
+    VkImage image = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+  } depthStencil;
 
   GLFWwindow *window = nullptr;
   nlohmann::json config{};
-  bool isFramebufferResized_ = false;
+  bool isFramebufferResized = false;
+
+  std::vector<const char *> validationLayers_ = {
+      "VK_LAYER_KHRONOS_validation",
+  };
 
 #if !defined(NDEBUG)
-  DebugMessenger debug_{};
+  DebugMessenger debugMessenger{};
 #endif
-  std::vector<const char *> validationLayers_ = {
-#ifdef __APPLE__
-      "VK_LAYER_KHRONOS_validation",
-#else
-#endif
-  };
-  std::vector<const char *> deviceExtensions_ = {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-  };
+
 #if defined(NDEBUG)
   const bool isEnableValidationLayers_ = false;
 #else

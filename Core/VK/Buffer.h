@@ -1,5 +1,6 @@
 #pragma once
 
+/*
 #include <vulkan/vulkan.h>
 
 #include <vector>
@@ -43,3 +44,4 @@ struct Buffer {
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory memory = VK_NULL_HANDLE;
 };
+ */

@@ -2,8 +2,6 @@
 
 #include "VK/VkBase.h"
 
-#include "VK/Buffer/Buffer.h"
-
 class HelloTriangle : public VkBase {
 public:
   void OnPostInit() override;

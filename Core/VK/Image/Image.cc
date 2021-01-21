@@ -2,18 +2,16 @@
 
 #include <boost/assert.hpp>
 
-#include "VK/Buffer/Command.h"
-#include "VK/Buffer/DepthStencil.h"
-#include "VK/Buffer/Memory.h"
-#include "VK/Instance.h"
+#include "VK/Device.h"
+#include "VK/Common.h"
+#include "VK/Initializer.h"
 
 namespace Image {
-void Create(const Instance &instance, uint32_t w, uint32_t h,
+void Create(const Device &device, uint32_t w, uint32_t h,
             VkImageCreateFlags flags, VkFormat format, VkImageTiling tiling,
             VkImageUsageFlags usage, VkMemoryPropertyFlags props,
             VkImage &image, VkDeviceMemory &memory) {
-  VkImageCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  VkImageCreateInfo create = Initializer::ImageCreateInfo();
   create.flags = flags;
   create.imageType = VK_IMAGE_TYPE_2D;
   create.extent.width = w;
@@ -27,33 +25,23 @@ void Create(const Instance &instance, uint32_t w, uint32_t h,
   create.usage = usage;
   create.samples = VK_SAMPLE_COUNT_1_BIT;
   create.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vkCreateImage(instance.device, &create, nullptr, &image)) {
-    BOOST_ASSERT_MSG(false, "Failed to create image!");
-  }
+  VK_CHECK_RESULT(vkCreateImage(device, &create, nullptr, &image));
 
   VkMemoryRequirements req{};
-  vkGetImageMemoryRequirements(instance.device, image, &req);
+  vkGetImageMemoryRequirements(device, image, &req);
 
   VkMemoryAllocateInfo alloc{};
   alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   alloc.allocationSize = req.size;
-  if (const auto type = Memory::FindType(req.memoryTypeBits, props,
-                                         instance.physicalDevice)) {
-    alloc.memoryTypeIndex = type.value();
-  } else {
-    BOOST_ASSERT_MSG(false, "Failed to find memory type!");
-  }
-  if (vkAllocateMemory(instance.device, &alloc, nullptr, &memory)) {
-    BOOST_ASSERT_MSG(false, "Failed to allocate buffer memory!");
-  }
-  vkBindImageMemory(instance.device, image, memory, 0);
+  alloc.memoryTypeIndex = device.FindMemoryType(req.memoryTypeBits, props);
+
+  VK_CHECK_RESULT(vkAllocateMemory(device, &alloc, nullptr, &memory));
+  VK_CHECK_RESULT(vkBindImageMemory(device, image, memory, 0));
 }
 
-void TransitionImageLayout(const Instance &instance, VkImage image,
+void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image,
                            VkFormat format, VkImageLayout old,
                            VkImageLayout flesh, bool isCubeMap) {
-  VkCommandBuffer command = Command::Get(instance);
-
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.oldLayout = old;
@@ -64,7 +52,8 @@ void TransitionImageLayout(const Instance &instance, VkImage image,
 
   if (flesh == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (DepthStencil::HasStencilComponent(format)) {
+    if (format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+        format == VK_FORMAT_D24_UNORM_S8_UINT) {
       barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
   } else {
@@ -102,8 +91,7 @@ void TransitionImageLayout(const Instance &instance, VkImage image,
     BOOST_ASSERT_MSG(false, "Unsupported layout transition!");
   }
 
-  vkCmdPipelineBarrier(command, src, dst, 0, 0, nullptr, 0, nullptr, 1,
+  vkCmdPipelineBarrier(commandBuffer, src, dst, 0, 0, nullptr, 0, nullptr, 1,
                        &barrier);
-  Command::Flush(instance, command);
 }
 } // namespace Image

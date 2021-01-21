@@ -3,10 +3,7 @@
 #include <map>
 #include <spdlog/spdlog.h>
 
-#include "VK/Instance.h"
-
-namespace Utils {
-float CalcDeviceScore(VkPhysicalDevice device, VkSurfaceKHR surface,
+float CalcDeviceScore(VkPhysicalDevice device,
                       const std::vector<const char *> &deviceExtensions) {
   VkPhysicalDeviceProperties prop{};
   vkGetPhysicalDeviceProperties(device, &prop);
@@ -21,14 +18,6 @@ float CalcDeviceScore(VkPhysicalDevice device, VkSurfaceKHR surface,
     score = scores[prop.deviceType];
   } else {
     score = 1.0f;
-  }
-
-  const auto families = QueueFamilies::Find(device, surface);
-  if (!families.IsComplete()) {
-#if !defined(NDEBUG)
-    spdlog::warn("Missing suitable queue family");
-#endif
-    score = 0;
   }
 
   uint32_t size = 0;
@@ -47,30 +36,6 @@ float CalcDeviceScore(VkPhysicalDevice device, VkSurfaceKHR surface,
 #if !defined(NDEBUG)
     spdlog::warn("Missing device extensions");
 #endif
-  } else {
-    size = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &size, nullptr);
-    std::vector<VkSurfaceFormatKHR> formats(size);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &size,
-                                         formats.data());
-    if (formats.empty()) {
-      score = 0;
-#if !defined(NDEBUG)
-      spdlog::warn("Missing surface formats");
-#endif
-    }
-
-    size = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &size, nullptr);
-    std::vector<VkPresentModeKHR> modes(size);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &size,
-                                              modes.data());
-    if (modes.empty()) {
-      score = 0;
-#if !defined(NDEBUG)
-      spdlog::warn("Missing present modes");
-#endif
-    }
   }
 
   if (!feat.samplerAnisotropy) {
@@ -90,5 +55,3 @@ float CalcDeviceScore(VkPhysicalDevice device, VkSurfaceKHR surface,
 
   return score;
 }
-
-} // namespace Utils

@@ -7,12 +7,11 @@
 
 #include <string>
 
-struct Instance;
-struct Pipelines;
+struct Device;
 
 struct Texture {
-  void Create(const Instance &instance, const std::string &filepath);
-  void Destroy(const Instance &instance) const;
+  void Create(const Device& device, const std::string &filepath);
+  void Destroy(const Device& instance) const;
 
   VkImage image = VK_NULL_HANDLE;
   VkImageView view = VK_NULL_HANDLE;

@@ -2,10 +2,10 @@
 
 #include <vulkan/vulkan.h>
 
-struct Instance;
+struct Device;
 
 namespace ImageView {
-VkImageView Create(const Instance &instance, VkImage image,
+VkImageView Create(const Device& device, VkImage image,
                    VkImageViewType type, VkFormat format,
                    VkImageAspectFlags flags);
 }

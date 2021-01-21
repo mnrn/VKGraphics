@@ -1,11 +1,11 @@
-#include "VK/Pipeline/Shader.h"
+#include "VK/Shader.h"
 
 #include <boost/assert.hpp>
 #include <fstream>
 #include <iostream>
 #include <variant>
 
-#include "VK/Instance.h"
+#include "VK/Common.h"
 
 #define SHADER_ENTRY_POINT "main"
 
@@ -25,14 +25,14 @@ ReadFile(const std::string &filename) {
   return std::move(buffer);
 }
 
-VkPipelineShaderStageCreateInfo Create(const Instance &instance,
-                                       const std::string &filepath,
+VkPipelineShaderStageCreateInfo Create(const std::string &filepath,
+                                       VkDevice device,
                                        VkShaderStageFlagBits stage,
                                        VkSpecializationInfo *specialization) {
   const auto v = ReadFile(filepath);
   if (std::holds_alternative<std::string>(v)) {
     std::cerr << std::get<std::string>(v) << std::endl;
-    BOOST_ASSERT_MSG(false, "Failed to create shader!");
+    BOOST_ASSERT_MSG(!std::holds_alternative<std::string>(v), "Failed to create shader!");
   }
   const auto code = std::get<std::vector<char>>(v);
 
@@ -42,10 +42,7 @@ VkPipelineShaderStageCreateInfo Create(const Instance &instance,
   create.pCode = reinterpret_cast<const uint32_t *>(code.data());
 
   VkShaderModule module;
-  if (vkCreateShaderModule(instance.device, &create, nullptr, &module)) {
-    std::cerr << "Failed to create shader module: " + filepath;
-    BOOST_ASSERT(false);
-  }
+  VK_CHECK_RESULT(vkCreateShaderModule(device, &create, nullptr, &module));
 
   VkPipelineShaderStageCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
