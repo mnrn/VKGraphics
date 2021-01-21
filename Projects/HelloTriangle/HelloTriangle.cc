@@ -137,6 +137,10 @@ void HelloTriangle::BuildCommandBuffers() {
   }
 }
 
+void HelloTriangle::ViewChanged() {
+  UpdateUniformBuffers();
+}
+
 //*-----------------------------------------------------------------------------
 // Setup
 //*-----------------------------------------------------------------------------

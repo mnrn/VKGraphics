@@ -17,6 +17,7 @@ public:
   void SetupDescriptorSet();
 
   void BuildCommandBuffers() override;
+  void ViewChanged() override;
 
 private:
   // パイプラインレイアウトは記述子セットにアクセスするためにパイプラインによって使用されます。
