@@ -13,7 +13,5 @@ int main() {
   BOOST_ASSERT_MSG(config, "Failed to open Config.json!");
 
   App app(config.value());
-  std::unique_ptr<VkBase> hello = std::make_unique<HelloTriangle>();
-
-  return app.Run(std::move(hello));
+  return app.Run(std::make_unique<HelloTriangle>());
 }

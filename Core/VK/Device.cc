@@ -35,7 +35,7 @@ void Device::Init(VkPhysicalDevice selectedDevice) {
   if (extensionCount > 0) {
     std::vector<VkExtensionProperties> extensions(extensionCount);
     if (vkEnumerateDeviceExtensionProperties(
-            physicalDevice, nullptr, &extensionCount, extensions.data())) {
+            physicalDevice, nullptr, &extensionCount, extensions.data()) == VK_SUCCESS) {
       for (auto &extension : extensions) {
         supportExtensions.emplace_back(extension.extensionName);
       }
