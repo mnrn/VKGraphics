@@ -74,7 +74,7 @@ void HelloTriangle::BuildCommandBuffers() {
   // LoadOpをclearに設定して　すべてのフレームバッファにclear値を設定します。
   // サブパスの開始時にクリアされる2つのアタッチメント(カラーとデプス)を使用するため、両方にクリア値を設定する必要があります。
   std::array<VkClearValue, 2> clear{};
-  clear[0].color = {{0.0f, 0.0f, 0.2f, 1.0f}};
+  clear[0].color = {{0.2f, 0.2f, 0.2f, 1.0f}};
   clear[1].depthStencil = {1.0f, 0};
 
   VkRenderPassBeginInfo renderPassBeginInfo =
@@ -321,9 +321,9 @@ void HelloTriangle::SetupDescriptorSet() {
 void HelloTriangle::PrepareVertices() {
   // 頂点を設定します。
   std::vector<Vertex> vertexBuffer = {
-      {{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-      {{-1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-      {{0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
+      {{-1.0f, -0.866f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+      {{1.0f, -0.866f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+      {{0.0f, 0.866f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
 
   uint32_t vertexBufferSize =
       static_cast<uint32_t>(vertexBuffer.size()) * sizeof(Vertex);
@@ -514,6 +514,7 @@ void HelloTriangle::UpdateUniformBuffers() {
                               static_cast<float>(swapchain.extent.width) /
                                   static_cast<float>(swapchain.extent.height),
                               1.0f, 100.0f);
+  ubo.proj[1][1] *= -1.0f;
 
   // ユニフォームバッファをマップして更新します。
   std::byte *pData;
