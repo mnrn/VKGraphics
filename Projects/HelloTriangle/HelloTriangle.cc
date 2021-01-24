@@ -38,7 +38,7 @@ void HelloTriangle::OnPostInit() {
   PrepareUniformBuffers();
 
   SetupDescriptorSetLayout();
-  PreparePipelines();
+  SetupPipelines();
   SetupDescriptorPool();
   SetupDescriptorSet();
 
@@ -175,7 +175,7 @@ void HelloTriangle::SetupDescriptorSetLayout() {
  * Vulkanは、レンダリングパイプラインの概念を用いてFixedStatusをカプセル化し、OpenGLの複雑なステートマシンを置き換えます。<br>
  * パイプラインはGPUに保存およびハッシュされ、パイプラインの変更が非常に高速になります。
  */
-void HelloTriangle::PreparePipelines() {
+void HelloTriangle::SetupPipelines() {
   // パイプラインに使用されるレイアウトとレンダーパスを指定します。
   VkGraphicsPipelineCreateInfo pipelineCreateInfo =
       Initializer::PipelineCreateInfo(pipelineLayout, renderPass);

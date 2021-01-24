@@ -34,7 +34,6 @@ message("@@ GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
 # imgui
 include_directories(SYSTEM third-party/imgui)
 
-
 # Warnings
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wundef")
@@ -57,10 +56,7 @@ function(build TARGET_NAME)
     file(GLOB SOURCE
         *.cc
         Core/VK/*.cc
-        Core/VK/Image/*.cc
-        Core/VK/Pipeline/*.cc
-        Core/VK/Buffer/*.cc
-        Core/VK/Sync/*.cc
+        Common/View/*cc
         ${PROJECTS_DIR_NAME}/${TARGET_NAME}/*.cc
         )
     set(MAIN_CC ${TARGET_NAME}/${TARGET_NAME}/Main.cc)
@@ -90,6 +86,6 @@ endfunction(buildAll)
 set(TARGETS
     #MinimalVK
     HelloTriangle
-    #TextureMapping
+    TextureMapping
     )
 buildAll()

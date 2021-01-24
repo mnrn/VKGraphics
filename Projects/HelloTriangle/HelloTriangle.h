@@ -12,7 +12,7 @@ public:
   void UpdateUniformBuffers();
 
   void SetupDescriptorSetLayout();
-  void PreparePipelines();
+  void SetupPipelines();
   void SetupDescriptorPool();
   void SetupDescriptorSet();
 

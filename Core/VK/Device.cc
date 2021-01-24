@@ -34,8 +34,9 @@ void Device::Init(VkPhysicalDevice selectedDevice) {
                                        nullptr);
   if (extensionCount > 0) {
     std::vector<VkExtensionProperties> extensions(extensionCount);
-    if (vkEnumerateDeviceExtensionProperties(
-            physicalDevice, nullptr, &extensionCount, extensions.data()) == VK_SUCCESS) {
+    if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr,
+                                             &extensionCount,
+                                             extensions.data()) == VK_SUCCESS) {
       for (auto &extension : extensions) {
         supportExtensions.emplace_back(extension.extensionName);
       }
@@ -270,9 +271,74 @@ Device::CreateLogicalDevice(VkPhysicalDeviceFeatures requestedFeatures,
 }
 
 /**
+ * @brief デバイス上にバッファを生成します。
+ * @param device Vulkanデバイス
+ * @param bufferUsageFlags 使用フラグビットマスク(Vertex, Index, Uniformなど)
+ * @param memoryPropertyFlags
+ * メモリプロパティ(DeviceLocal, HostVisible, ÒCoherentなど)
+ * @param size バイト単位のバッファサイズ
+ * @param buffer バッファハンドルへのポインタ
+ * @param memory メモリハンドルへのポインタ
+ * @param data 生成後にバッファをコピーする必要があるデータへのポインタ
+ * @return バッファハンドルとメモリが生成された場合、VK_SUCCESSを返します。
+ */
+VkResult Device::CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
+                              VkMemoryPropertyFlags memoryPropertyFlags,
+                              VkDeviceSize size, VkBuffer *buffer,
+                              VkDeviceMemory *memory, const void *data) const {
+  // バッファハンドルを生成します。
+  VkBufferCreateInfo bufferCreateInfo =
+      Initializer::BufferCreateInfo(bufferUsageFlags, size);
+  bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  VK_CHECK_RESULT(
+      vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, buffer));
+
+  // バッファハンドルをバックアップするメモリを生成します。
+  VkMemoryRequirements memoryRequirements{};
+  vkGetBufferMemoryRequirements(logicalDevice, *buffer, &memoryRequirements);
+  VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+
+  // バッファのプロパティに適合するメモリタイプのインデックスを見つけます。
+  memoryAllocateInfo.memoryTypeIndex =
+      FindMemoryType(memoryRequirements.memoryTypeBits, memoryPropertyFlags);
+
+  // バッファにVK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BITが設定されている場合は、メモリ割り当て中に適切なフラグも有効にする必要があります。
+  VkMemoryAllocateFlagsInfoKHR allocateFlagsInfo{};
+  if (bufferUsageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+    allocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR;
+    allocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    memoryAllocateInfo.pNext = &allocateFlagsInfo;
+  }
+  VK_CHECK_RESULT(
+      vkAllocateMemory(logicalDevice, &memoryAllocateInfo, nullptr, memory));
+
+  // バッファデータへのポインタが渡された場合は、バッファをマップしてデータをコピーします。
+  if (data != nullptr) {
+    void *mapped;
+    VK_CHECK_RESULT(vkMapMemory(logicalDevice, *memory, 0, size, 0, &mapped));
+    std::memcpy(mapped, data, size);
+
+    // ホストの一貫性(Coherency)がリクエストされていない場合は、手動でフラッシュして書き込みを表示します。
+    if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+      VkMappedMemoryRange mappedMemoryRange = Initializer::MappedMemoryRange();
+      mappedMemoryRange.memory = *memory;
+      mappedMemoryRange.offset = 0;
+      mappedMemoryRange.size = size;
+      VK_CHECK_RESULT(
+          vkFlushMappedMemoryRanges(logicalDevice, 1, &mappedMemoryRange));
+    }
+    vkUnmapMemory(logicalDevice, *memory);
+  }
+  // メモリをバッファオブジェクトにアタッチします。
+  VK_CHECK_RESULT(vkBindBufferMemory(logicalDevice, *buffer, *memory, 0));
+  return VK_SUCCESS;
+}
+
+/**
  * @brief アロケートコマンドバッファ用のコマンドプールを生成します。
  * @param queueFamilyIndex
- * コマンドプールを生成するためのきゅーのファミリーインデックス
+ * コマンドプールを生成するためのキューのファミリーインデックス
  * @param createFlags(オプションです。) コマンド生成フラグ
  * @note
  * 生成されたプールからアロケートされたコマンドバッファは同じファミリーインデックスを持つキューにのみ送信できます。

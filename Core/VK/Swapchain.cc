@@ -9,7 +9,7 @@
 
 #include "VK/Common.h"
 #include "VK/Device.h"
-#include "VK/Image/ImageView.h"
+#include "VK/Initializer.h"
 
 static VkSurfaceFormatKHR
 FindSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &available) {
@@ -230,8 +230,26 @@ void Swapchain::Create(const Device &device, int width, int height,
   // swapchain buffers に含まれるimage viewを取得します。
   views.resize(imageCount);
   for (size_t i = 0; i < imageCount; i++) {
-    views[i] = ImageView::Create(device, images[i], VK_IMAGE_VIEW_TYPE_2D,
-                                 format, VK_IMAGE_ASPECT_COLOR_BIT);
+    VkImageViewCreateInfo imageViewCreateInfo =
+        Initializer::ImageViewCreateInfo();
+    imageViewCreateInfo.pNext = nullptr;
+    imageViewCreateInfo.format = format;
+    imageViewCreateInfo.components = {
+        VK_COMPONENT_SWIZZLE_R,
+        VK_COMPONENT_SWIZZLE_G,
+        VK_COMPONENT_SWIZZLE_B,
+        VK_COMPONENT_SWIZZLE_A,
+    };
+    imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+    imageViewCreateInfo.subresourceRange.levelCount = 1;
+    imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+    imageViewCreateInfo.subresourceRange.layerCount = 1;
+    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imageViewCreateInfo.flags = 0;
+    imageViewCreateInfo.image = images[i];
+    VK_CHECK_RESULT(
+        vkCreateImageView(device, &imageViewCreateInfo, nullptr, &views[i]));
   }
 }
 

@@ -5,8 +5,8 @@
 #pragma once
 
 #ifdef __clang__
-#   pragma clang diagnostic push
-#   pragma clang diagnostic ignored "-Wswitch-enum"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #endif
 
 #include <cassert>
@@ -58,5 +58,5 @@ inline std::string ErrorString(VkResult errorCode) {
   } while (false)
 
 #ifdef __clang__
-#   pragma clang diagnostic pop
+#pragma clang diagnostic pop
 #endif

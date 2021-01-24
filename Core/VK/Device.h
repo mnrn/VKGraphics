@@ -25,10 +25,14 @@ public:
                     VkCommandPoolCreateFlags createFlags =
                         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT) const;
 
+  [[nodiscard]] VkResult CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
+                                      VkMemoryPropertyFlags memoryPropertyFlags,
+                                      VkDeviceSize size, VkBuffer *buffer,
+                                      VkDeviceMemory *memory, const void *data = nullptr) const;
+
   [[nodiscard]] VkCommandBuffer CreateCommandBuffer(
       VkCommandPool pool,
       VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-
       bool begin = true) const;
   [[nodiscard]] VkCommandBuffer CreateCommandBuffer(
       VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,

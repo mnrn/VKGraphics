@@ -1,523 +1,377 @@
 #include "TextureMapping.h"
 
-#include <boost/assert.hpp>
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
-#include <glm/gtc/constants.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+
+#include <array>
+#include <boost/assert.hpp>
 #include <vector>
 
-#include "VK/Pipeline/Shader.h"
-
-//*-----------------------------------------------------------------------------
-// Constant expressions
-//*-----------------------------------------------------------------------------
+#include "VK/Common.h"
+#include "VK/Initializer.h"
+#include "VK/Shader.h"
 
 struct Vertex {
   glm::vec3 pos;
-  glm::vec3 color;
-  glm::vec2 texCoord;
-
-  static VkVertexInputBindingDescription Bindings() {
-    VkVertexInputBindingDescription bind;
-    bind.binding = 0;
-    bind.stride = sizeof(Vertex);
-    bind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bind;
-  }
-
-  static std::array<VkVertexInputAttributeDescription, 3> Attributes() {
-    std::array<VkVertexInputAttributeDescription, 3> attr{};
-    attr[0].binding = 0;
-    attr[0].location = 0;
-    attr[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attr[0].offset = offsetof(Vertex, pos);
-
-    attr[1].binding = 0;
-    attr[1].location = 1;
-    attr[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attr[1].offset = offsetof(Vertex, color);
-
-    attr[2].binding = 0;
-    attr[2].location = 2;
-    attr[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attr[2].offset = offsetof(Vertex, texCoord);
-
-    return attr;
-  }
+  glm::vec2 uv;
 };
-
-struct UniformBufferObject {
-  alignas(16) glm::mat4 model;
-  alignas(16) glm::mat4 view;
-  alignas(16) glm::mat4 proj;
-};
-
-static const std::vector<Vertex> vertices{
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
-static const std::vector<uint16_t> indices{0, 1, 2, 2, 3, 0};
-
-static constexpr float kRotSpeed = glm::quarter_pi<float>();
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
 //*-----------------------------------------------------------------------------
 
-void TextureMapping::OnUpdate(float t) {
-  const float deltaT = tPrev_ == 0.0f ? 0.0f : t - tPrev_;
-  tPrev_ = t;
+void TextureMapping::OnPostInit() {
+  VkBase::OnPostInit();
 
-  angle_ += kRotSpeed * deltaT;
-  if (angle_ > glm::two_pi<float>()) {
-    angle_ -= glm::two_pi<float>();
-  }
+  LoadAssets();
+
+  PrepareCamera();
+  PrepareVertices();
+  PrepareUniformBuffers();
+
+  SetupDescriptorSetLayout();
+  SetupPipelines();
+  SetupDescriptorPool();
+  SetupDescriptorSet();
+
+  BuildCommandBuffers();
 }
 
-void TextureMapping::CreateRenderPass() {
-  VkAttachmentDescription color{};
-  color.format = swapchain.format;
-  color.samples = VK_SAMPLE_COUNT_1_BIT;
-  color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+void TextureMapping::OnPreDestroy() {
+  texture.Destroy(device);
 
-  VkAttachmentReference colorRef{};
-  colorRef.attachment = 0;
-  colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  uniformBuffer.Destroy(device);
+  indexBuffer.Destroy(device);
+  vertexBuffer.Destroy(device);
 
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorRef;
-  subpass.pDepthStencilAttachment = nullptr;
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-  VkSubpassDependency dependency{};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  std::vector<VkAttachmentDescription> attachments{color};
-  VkRenderPassCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  create.attachmentCount = static_cast<uint32_t>(attachments.size());
-  create.pAttachments = attachments.data();
-  create.subpassCount = 1;
-  create.pSubpasses = &subpass;
-  create.dependencyCount = 1;
-  create.pDependencies = &dependency;
-
-  if (vkCreateRenderPass(instance.device, &create, nullptr, &renderPass)) {
-    BOOST_ASSERT_MSG(false, "Failed to create render pass!");
-  }
+  vkDestroyPipeline(device, pipeline, nullptr);
+  vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 }
 
-void TextureMapping::CreateDescriptorSetLayouts() {
-  if (descriptors_.layout != VK_NULL_HANDLE) {
-    return;
-  }
+/**
+ * @brief フレームバッファイメージごとに個別のコマンドバッファを構築します。
+ * @note
+ * OpenGLとは異なり、すべてのレンダリングコマンドはコマンドバッファに一度記録され、その後キューに再送信されます。<br>
+ * これにより、Vulkanの最大の利点の１つである、複数のスレッドから事前に作業を生成できます。
+ */
+void TextureMapping::BuildCommandBuffers() {
+  VkCommandBufferBeginInfo commandBufferBeginInfo =
+      Initializer::CommandBufferBeginInfo();
 
-  VkDescriptorSetLayoutBinding ubo{};
-  ubo.binding = 0;
-  ubo.descriptorCount = 1;
-  ubo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  ubo.pImmutableSamplers = nullptr;
-  ubo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  // LoadOpをclearに設定して　すべてのフレームバッファにclear値を設定します。
+  // サブパスの開始時にクリアされる2つのアタッチメント(カラーとデプス)を使用するため、両方にクリア値を設定する必要があります。
+  std::array<VkClearValue, 2> clear{};
+  clear[0].color = {{0.8f, 0.8f, 0.8f, 1.0f}};
+  clear[1].depthStencil = {1.0f, 0};
 
-  VkDescriptorSetLayoutBinding sampler{};
-  sampler.binding = 1;
-  sampler.descriptorCount = 1;
-  sampler.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  sampler.pImmutableSamplers = nullptr;
-  sampler.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  VkRenderPassBeginInfo renderPassBeginInfo =
+      Initializer::RenderPassBeginInfo();
+  renderPassBeginInfo.renderPass = renderPass;
+  renderPassBeginInfo.renderArea.offset.x = 0;
+  renderPassBeginInfo.renderArea.offset.y = 0;
+  renderPassBeginInfo.renderArea.extent.width = swapchain.extent.width;
+  renderPassBeginInfo.renderArea.extent.height = swapchain.extent.height;
+  renderPassBeginInfo.clearValueCount = 2;
+  renderPassBeginInfo.pClearValues = clear.data();
 
-  std::vector<VkDescriptorSetLayoutBinding> binds{ubo, sampler};
-  VkDescriptorSetLayoutCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  create.bindingCount = static_cast<uint32_t>(binds.size());
-  create.pBindings = binds.data();
+  for (size_t i = 0; i < drawCmdBuffers.size(); i++) {
+    // ターゲットフレームバッファを設定します。
+    renderPassBeginInfo.framebuffer = framebuffers[i];
+    VK_CHECK_RESULT(
+        vkBeginCommandBuffer(drawCmdBuffers[i], &commandBufferBeginInfo));
 
-  if (vkCreateDescriptorSetLayout(instance.device, &create, nullptr,
-                                  &descriptors_.layout)) {
-    BOOST_ASSERT_MSG(false, "Failed to create descriptor set layout!");
-  }
-}
-
-void TextureMapping::DestroyDescriptorSetLayouts() {
-  vkDestroyDescriptorSetLayout(instance.device, descriptors_.layout, nullptr);
-}
-
-void TextureMapping::CreatePipelines() {
-  {
-    VkPipelineLayoutCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create.setLayoutCount = 1;
-    create.pSetLayouts = &descriptors_.layout;
-    if (vkCreatePipelineLayout(instance.device, &create, nullptr,
-                               &pipelines_.layout)) {
-      BOOST_ASSERT_MSG(false, "Failed to create pipeline layout");
-    }
-  }
-
-  for (const auto &pipeline : config_["Pipelines"]) {
-    std::vector<VkShaderModule> modules;
-    std::vector<VkPipelineShaderStageCreateInfo> stages;
-
-    {
-      const std::string &vs = pipeline["VertexShader"].get<std::string>();
-      Shader::Create(instance, vs, VK_SHADER_STAGE_VERTEX_BIT, nullptr,
-                     modules, stages);
-      const std::string &fs = pipeline["FragmentShader"].get<std::string>();
-      Shader::Create(instance, fs, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr,
-                     modules, stages);
-    }
-
-    auto binds = Vertex::Bindings();
-    auto attrs = Vertex::Attributes();
-    VkPipelineVertexInputStateCreateInfo vi{};
-    vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vi.vertexBindingDescriptionCount = 1;
-    vi.pVertexBindingDescriptions = &binds;
-    vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
-    vi.pVertexAttributeDescriptions = attrs.data();
-
-    VkPipelineInputAssemblyStateCreateInfo as{};
-    as.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    as.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    as.primitiveRestartEnable = VK_FALSE;
-
-    VkViewport vp{};
-    vp.x = 0.0f;
-    vp.y = 0.0f;
-    vp.width = static_cast<float>(swapchain.extent.width);
-    vp.height = static_cast<float>(swapchain.extent.height);
-    vp.minDepth = 0.0f;
-    vp.maxDepth = 1.0f;
-
-    VkRect2D sc{};
-    sc.offset = {0, 0};
-    sc.extent = swapchain.extent;
-
-    VkPipelineViewportStateCreateInfo vs{};
-    vs.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    vs.viewportCount = 1;
-    vs.pViewports = &vp;
-    vs.scissorCount = 1;
-    vs.pScissors = &sc;
-
-    VkPipelineRasterizationStateCreateInfo rz{};
-    rz.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rz.depthClampEnable = VK_FALSE;
-    rz.rasterizerDiscardEnable = VK_FALSE;
-    rz.polygonMode = VK_POLYGON_MODE_FILL;
-    rz.lineWidth = 1.0f;
-    rz.cullMode = VK_CULL_MODE_BACK_BIT;
-    rz.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rz.depthBiasEnable = VK_FALSE;
-    rz.depthBiasConstantFactor = 0.0f;
-    rz.depthBiasClamp = 0.0f;
-    rz.depthBiasSlopeFactor = 0.0f;
-
-    VkPipelineMultisampleStateCreateInfo ms{};
-    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    ms.sampleShadingEnable = VK_FALSE;
-    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    ms.minSampleShading = 1.0f;
-    ms.pSampleMask = nullptr;
-    ms.alphaToCoverageEnable = VK_FALSE;
-    ms.alphaToOneEnable = VK_FALSE;
-
-    VkPipelineColorBlendAttachmentState bl{};
-    bl.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    bl.blendEnable = VK_FALSE;
-    bl.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    bl.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-    bl.colorBlendOp = VK_BLEND_OP_ADD;
-    bl.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    bl.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    bl.alphaBlendOp = VK_BLEND_OP_ADD;
-
-    VkPipelineColorBlendStateCreateInfo bs{};
-    bs.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    bs.logicOpEnable = VK_FALSE;
-    bs.logicOp = VK_LOGIC_OP_COPY;
-    bs.attachmentCount = 1;
-    bs.pAttachments = &bl;
-    bs.blendConstants[0] = 0.0f;
-    bs.blendConstants[1] = 0.0f;
-    bs.blendConstants[2] = 0.0f;
-    bs.blendConstants[3] = 0.0f;
-
-    VkPipelineDepthStencilStateCreateInfo ds{};
-    ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    ds.depthTestEnable = VK_TRUE;
-    ds.depthWriteEnable = VK_TRUE;
-    ds.depthCompareOp = VK_COMPARE_OP_LESS;
-    ds.depthBoundsTestEnable = VK_FALSE;
-    ds.minDepthBounds = 0.0f;
-    ds.maxDepthBounds = 1.0f;
-    ds.stencilTestEnable = VK_FALSE;
-    ds.front = {};
-    ds.back = {};
-
-    VkGraphicsPipelineCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    create.stageCount = static_cast<uint32_t>(stages.size());
-    create.pStages = stages.data();
-    create.pVertexInputState = &vi;
-    create.pInputAssemblyState = &as;
-    create.pViewportState = &vs;
-    create.pRasterizationState = &rz;
-    create.pMultisampleState = &ms;
-    create.pDepthStencilState = &ds;
-    create.pColorBlendState = &bs;
-    create.pDynamicState = nullptr;
-    create.layout = pipelines_.layout;
-    create.renderPass = renderPass;
-    create.subpass = 0;
-    create.basePipelineHandle = VK_NULL_HANDLE;
-    create.basePipelineIndex = -1;
-
-    VkPipeline handle;
-    if (vkCreateGraphicsPipelines(instance.device, VK_NULL_HANDLE, 1, &create,
-                                  nullptr, &handle)) {
-      BOOST_ASSERT_MSG(false, "Failed to create graphics pipeline");
-    }
-    pipelines_.handles.emplace_back(handle);
-    for (const auto &module : modules) {
-      vkDestroyShaderModule(instance.device, module, nullptr);
-    }
-  }
-}
-
-void TextureMapping::DestroyPipelines() { pipelines_.Destroy(instance); }
-
-void TextureMapping::CreateFramebuffers() {
-  framebuffers.resize(swapchain.views.size());
-  for (size_t i = 0; i < framebuffers.size(); i++) {
-    std::vector<VkImageView> attachments = {swapchain.views[i],
-                                            /* depthView */};
-    VkFramebufferCreateInfo create{};
-    create.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    create.renderPass = renderPass;
-    create.attachmentCount = static_cast<uint32_t>(attachments.size());
-    create.pAttachments = attachments.data();
-    create.width = swapchain.extent.width;
-    create.height = swapchain.extent.height;
-    create.layers = 1;
-    if (vkCreateFramebuffer(instance.device, &create, nullptr,
-                            &framebuffers[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to create framebuffer!");
-    }
-  }
-}
-
-void TextureMapping::SetupAssets() {
-  texture_.Create(instance, "./Assets/Textures/SelfMade/star.png");
-
-  VkPhysicalDeviceProperties props{};
-  vkGetPhysicalDeviceProperties(instance.physicalDevice, &props);
-
-  VkSamplerCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  create.magFilter = VK_FILTER_LINEAR;
-  create.minFilter = VK_FILTER_LINEAR;
-  create.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  create.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  create.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  create.anisotropyEnable = VK_TRUE;
-  create.maxAnisotropy = props.limits.maxSamplerAnisotropy;
-  create.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-  create.unnormalizedCoordinates = VK_FALSE;
-  create.compareEnable = VK_FALSE;
-  create.compareOp = VK_COMPARE_OP_ALWAYS;
-  create.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-
-  if (vkCreateSampler(instance.device, &create, nullptr, &texture_.sampler)) {
-    BOOST_ASSERT_MSG(false, "Failed to create texture sampler!");
-  }
-}
-
-void TextureMapping::CleanupAssets() { texture_.Destroy(instance); }
-
-void TextureMapping::CreateVertexBuffer() {
-  vertex_.Create(instance, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-}
-
-void TextureMapping::CreateIndexBuffer() {
-  index_.Create(instance, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-}
-
-void TextureMapping::CreateDrawCommandBuffers() {
-  commandBuffers_.draw.resize(framebuffers.size());
-
-  VkCommandBufferAllocateInfo alloc{};
-  alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc.commandPool = instance.pool;
-  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc.commandBufferCount = static_cast<uint32_t>(commandBuffers_.draw.size());
-  if (vkAllocateCommandBuffers(instance.device, &alloc,
-                               commandBuffers_.draw.data())) {
-    BOOST_ASSERT_MSG(false, "Failed to alloc draw command buffers!");
-  }
-
-  for (size_t i = 0; i < commandBuffers_.draw.size(); i++) {
-    VkCommandBufferBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-    begin.pInheritanceInfo = nullptr;
-
-    if (vkBeginCommandBuffer(commandBuffers_.draw[i], &begin)) {
-      BOOST_ASSERT_MSG(false, "Failed to begin recording command buffer!");
-    }
-
-    VkRenderPassBeginInfo render{};
-    render.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render.renderPass = renderPass;
-    render.framebuffer = framebuffers[i];
-    render.renderArea.offset = {0, 0};
-    render.renderArea.extent = swapchain.extent;
-
-    std::array<VkClearValue, 1> clear{};
-    clear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    render.clearValueCount = static_cast<uint32_t>(clear.size());
-    render.pClearValues = clear.data();
-
-    vkCmdBeginRenderPass(commandBuffers_.draw[i], &render,
+    // デフォルトのレンダーパス設定で指定された最初のサブパスを開始します。
+    // これにより、色と奥行きのアタッチメントがクリアされます。
+    vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
-    {
-      vkCmdBindPipeline(commandBuffers_.draw[i],
-                        VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_[0]);
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(commandBuffers_.draw[i], 0, 1, &vertex_.buffer,
-                             offsets);
-      vkCmdBindIndexBuffer(commandBuffers_.draw[i], index_.buffer, 0,
-                           VK_INDEX_TYPE_UINT16);
-      vkCmdBindDescriptorSets(
-          commandBuffers_.draw[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-          pipelines_.layout, 0, 1, &descriptors_[i], 0, nullptr);
 
-      vkCmdDrawIndexed(commandBuffers_.draw[i],
-                       static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-    }
-    vkCmdEndRenderPass(commandBuffers_.draw[i]);
+    // ビューポートとシザーの更新
+    VkViewport viewport = Initializer::Viewport(
+        static_cast<float>(swapchain.extent.width),
+        static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
+    vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+    VkRect2D scissor = Initializer::Rect2D(swapchain.extent.width,
+                                           swapchain.extent.height, 0, 0);
+    vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-    if (vkEndCommandBuffer(commandBuffers_.draw[i])) {
-      BOOST_ASSERT_MSG(false, "Failed to record draw command buffer!");
-    }
+    // 記述子セットとパイプラインのバインド
+    vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipeline);
+
+    // 三角形の頂点バッファとインデックスバッファをバインドします。
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer,
+                           offsets);
+    vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0,
+                         VK_INDEX_TYPE_UINT32);
+
+    // インデックス付きの三角形を描画します。
+    vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 1);
+
+    vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+    // レンダーパスを終了すると、フレームバッファのカラーアタッチメントに移行する暗黙のバリアが追加されます。
+    VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
   }
 }
 
-void TextureMapping::CreateUniformBuffers() {
-  VkDeviceSize size = sizeof(UniformBufferObject);
-  uniforms_.resize(swapchain.images.size());
+void TextureMapping::ViewChanged() { UpdateUniformBuffers(); }
 
-  for (size_t i = 0; i < swapchain.images.size(); i++) {
-    Buffer::Create(instance, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                   uniforms_[i].buffer, uniforms_[i].memory);
-  }
+//*-----------------------------------------------------------------------------
+// Assets
+//*-----------------------------------------------------------------------------
+
+void TextureMapping::LoadAssets() {
+  texture.Load(device, "./Assets/Textures/png/Brick/ruin_wall_01.png",
+               VK_FORMAT_R8G8B8A8_SRGB, queue);
 }
 
-void TextureMapping::DestroyUniformBuffers() {
-  for (size_t i = 0; i < swapchain.images.size(); i++) {
-    uniforms_[i].Destroy(instance);
-  }
+//*-----------------------------------------------------------------------------
+// Setup
+//*-----------------------------------------------------------------------------
+
+/**
+ * @brief 使用される記述子のレイアウトを設定します。<br>
+ * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
+ * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
+ */
+void TextureMapping::SetupDescriptorSetLayout() {
+  std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+      Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                              VK_SHADER_STAGE_VERTEX_BIT, 0),
+      Initializer::DescriptorSetLayoutBinding(
+          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+          VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+  };
+
+  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo =
+      Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+      device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
+
+  // この記述子セットレイアウトに基づくレンダリングパイプラインを生成するために使用されるパイプラインレイアウトを作成します。
+  // より複雑なシナリオでは、再利用できる記述子セットのレイアウトごとに異なるパイプラインレイアウトがあります。
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
+      Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
+  VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
+                                         nullptr, &pipelineLayout));
 }
 
-void TextureMapping::UpdateUniformBuffers(uint32_t imageIndex) {
-  UniformBufferObject ubo;
-  ubo.model = glm::rotate(glm::mat4(1.0f), angle_, glm::vec3(0.0f, 0.0f, 1.0f));
-  ubo.view =
-      glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
-                  glm::vec3(0.0f, 0.0f, 1.0f));
-  ubo.proj = glm::perspective(glm::radians(45.0f),
-                              static_cast<float>(swapchain.extent.width) /
-                                  static_cast<float>(swapchain.extent.height),
-                              0.1f, 10.0f);
-  ubo.proj[1][1] *= -1;
+/**
+ * @note
+ * Vulkanは、レンダリングパイプラインの概念を用いてFixedStatusをカプセル化し、OpenGLの複雑なステートマシンを置き換えます。<br>
+ * パイプラインはGPUに保存およびハッシュされ、パイプラインの変更が非常に高速になります。
+ */
+void TextureMapping::SetupPipelines() {
+  // 入力アセンブリステートはプリミティブがどのようにアセンブルされるかを記述します。
+  // このパイプラインでは、頂点データを三角形リストとしてアセンブルします。
+  VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
+      Initializer::PipelineInputAssemblyStateCreateInfo(
+          VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
 
-  void *data;
-  vkMapMemory(instance.device, uniforms_[imageIndex].memory, 0, sizeof(ubo), 0,
-              &data);
-  std::memcpy(data, &ubo, sizeof(ubo));
-  vkUnmapMemory(instance.device, uniforms_[imageIndex].memory);
+  // ラスタライズステート
+  VkPipelineRasterizationStateCreateInfo rasterizationState =
+      Initializer::PipelineRasterizationStateCreateInfo(
+          VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE,
+          VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
+  // カラーブレンドステートは、ブレンド係数の計算方法を示します。
+  // カラーアタッチメントごとに１つのブレンドアタッチメント状態が必要です。
+  VkPipelineColorBlendAttachmentState blendAttachmentState =
+      Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE);
+  VkPipelineColorBlendStateCreateInfo colorBlendState =
+      Initializer::PipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+
+  // ビューポートステートは、このパイプラインで使用されるビューポートとシザーの数を設定します。
+  // NOTE: これは実際には動的にオーバーライドされます。
+  VkPipelineViewportStateCreateInfo viewportState =
+      Initializer::PipelineViewportStateCreateInfo(1, 1);
+
+  // ダイナミックステートを有効にします。
+  // ほとんどのステートはパイプラインに組み込まれていますが、コマンドバッファ内で変更できる動的なステートがまだいくつかあります。
+  // これらを変更できるようにするには、ダイナミックステートを指定する必要があります。それらの実際の状態は、後でコマンドバッファに設定されます。
+  std::vector<VkDynamicState> dynamicStates;
+  dynamicStates.emplace_back(VK_DYNAMIC_STATE_VIEWPORT);
+  dynamicStates.emplace_back(VK_DYNAMIC_STATE_SCISSOR);
+  VkPipelineDynamicStateCreateInfo dynamicState =
+      Initializer::PipelineDynamicStateCreateInfo(dynamicStates);
+
+  // 深度とステンシルの比較およびテスト操作を含むデプスステンシルステート
+  // 深度テストのみを使用し、深度テストと書き込みを有効にします。
+  VkPipelineDepthStencilStateCreateInfo depthStencilState =
+      Initializer::PipelineDepthStencilStateCreateInfo(
+          VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+  depthStencilState.depthBoundsTestEnable = VK_FALSE;
+  depthStencilState.back.failOp = VK_STENCIL_OP_KEEP;
+  depthStencilState.back.passOp = VK_STENCIL_OP_KEEP;
+  depthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
+  depthStencilState.stencilTestEnable = VK_FALSE;
+  depthStencilState.front = depthStencilState.back;
+
+  // マルチサンプリングステート
+  // この例では、マルチサンプリングを使用していません。
+  VkPipelineMultisampleStateCreateInfo multisampleState =
+      Initializer::PipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
+  multisampleState.pSampleMask = nullptr;
+
+  // 頂点入力バインディング
+  // この例では、バインディングポイント0で単一の頂点入力バインディングを使用しています。
+  vertex.bindings.resize(1);
+  vertex.bindings[0] = Initializer::VertexInputBindingDescription(
+      0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX);
+
+  // 入力属性バインディングはシェーダー属性の場所とメモリレイアウトを記述します。
+  // これらはシェーダーレイアウトに一致します。
+  vertex.attributes.resize(2);
+  vertex.attributes[0] = Initializer::VertexInputAttributeDescription(
+      0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos));
+  vertex.attributes[1] = Initializer::VertexInputAttributeDescription(
+      0, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv));
+
+  // パイプラインの作成に使用される頂点入力ステート
+  vertex.inputState = Initializer::PipelineVertexInputStateCreateInfo(
+      vertex.bindings, vertex.attributes);
+
+  // パイプラインに使用されるレイアウトとレンダーパスを指定します。
+  VkGraphicsPipelineCreateInfo pipelineCreateInfo =
+      Initializer::PipelineCreateInfo(pipelineLayout, renderPass);
+
+  // パイプラインシェーダーステージ情報を設定します。
+  std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+  shaderStages[0] = Shader::Create(config["VertexShader"].get<std::string>(),
+                                   device, VK_SHADER_STAGE_VERTEX_BIT);
+  shaderStages[1] = Shader::Create(config["FragmentShader"].get<std::string>(),
+                                   device, VK_SHADER_STAGE_FRAGMENT_BIT);
+  pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+  pipelineCreateInfo.pStages = shaderStages.data();
+
+  // パイプラインステートをpipelineCreateInfoに代入してきます。
+  pipelineCreateInfo.pVertexInputState = &vertex.inputState;
+  pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+  pipelineCreateInfo.pRasterizationState = &rasterizationState;
+  pipelineCreateInfo.pColorBlendState = &colorBlendState;
+  pipelineCreateInfo.pMultisampleState = &multisampleState;
+  pipelineCreateInfo.pViewportState = &viewportState;
+  pipelineCreateInfo.pDepthStencilState = &depthStencilState;
+  pipelineCreateInfo.pDynamicState = &dynamicState;
+
+  // 指定されたステートを使用してレンダリングパイプラインを作成します。
+  VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+      device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+
+  // グラフィックスパイプラインを作成した後は、シェーダーモジュールは不要になります。
+  vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+  vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
 }
 
-void TextureMapping::CreateDescriptorPool() {
-  std::array<VkDescriptorPoolSize, 2> sizes{};
-  sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  sizes[0].descriptorCount = static_cast<uint32_t>(swapchain.images.size());
-  sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  sizes[1].descriptorCount = static_cast<uint32_t>(swapchain.images.size());
+void TextureMapping::SetupDescriptorPool() {
+  // APIに記述子の最大数を通知する必要があります。
+  std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                      1),
+  };
 
-  VkDescriptorPoolCreateInfo create{};
-  create.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  create.poolSizeCount = static_cast<uint32_t>(sizes.size());
-  create.pPoolSizes = sizes.data();
-  create.maxSets = static_cast<uint32_t>(swapchain.images.size());
+  // グローバル記述子プールを生成します。
+  VkDescriptorPoolCreateInfo descriptorPoolInfo =
+      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes, 2);
 
-  if (vkCreateDescriptorPool(instance.device, &create, nullptr,
-                             &descriptorPool)) {
-    BOOST_ASSERT_MSG(false, "Failed to create descriptor pool!");
-  }
+  VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
+                                         &descriptorPool));
 }
 
-void TextureMapping::CreateDescriptorSets() {
-  std::vector<VkDescriptorSetLayout> layouts(swapchain.images.size(),
-                                             descriptors_.layout);
-  VkDescriptorSetAllocateInfo alloc{};
-  alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  alloc.descriptorPool = descriptorPool;
-  alloc.descriptorSetCount = static_cast<uint32_t>(swapchain.images.size());
-  alloc.pSetLayouts = layouts.data();
+void TextureMapping::SetupDescriptorSet() {
+  // グローバル記述子プールから新しい記述子セットを割り当てます。
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo =
+      Initializer::DescriptorSetAllocateInfo(descriptorPool,
+                                             &descriptorSetLayout, 1);
+  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                                           &descriptorSet));
 
-  descriptors_.handles.resize(swapchain.images.size());
-  if (vkAllocateDescriptorSets(instance.device, &alloc,
-                               descriptors_.handles.data())) {
-    BOOST_ASSERT_MSG(false, "Failed to allocate descriptor sets!");
-  }
+  // サンプラーとして使用されている現在のテクスチャの記述子画像情報を設定します。
+  std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+      Initializer::WriteDescriptorSet(descriptorSet,
+                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+                                      &uniformBuffer.descriptor),
+      Initializer::WriteDescriptorSet(descriptorSet,
+                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                      1, &texture.descriptor)};
+  vkUpdateDescriptorSets(device,
+                         static_cast<uint32_t>(writeDescriptorSets.size()),
+                         writeDescriptorSets.data(), 0, nullptr);
+}
 
-  for (size_t i = 0; i < swapchain.images.size(); i++) {
-    VkDescriptorBufferInfo buffer{};
-    buffer.buffer = uniforms_[i].buffer;
-    buffer.offset = 0;
-    buffer.range = sizeof(UniformBufferObject);
+//*-----------------------------------------------------------------------------
+// Prepare
+//*-----------------------------------------------------------------------------
 
-    VkDescriptorImageInfo image{};
-    image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image.imageView = texture_.view;
-    image.sampler = texture_.sampler;
+void TextureMapping::PrepareCamera() {
+  camera.SetupOrient(glm::vec3(0.0f, 0.0f, -2.5f), glm::vec3(0.0f, 0.0f, 0.0f),
+                     glm::vec3(0.0f, 1.0f, 0.0f));
+  camera.SetupPerspective(glm::radians(60.0f),
+                          static_cast<float>(swapchain.extent.width) /
+                              static_cast<float>(swapchain.extent.height),
+                          1.0f, 100.0f);
+}
 
-    std::array<VkWriteDescriptorSet, 2> writes{};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].dstSet = descriptors_[i];
-    writes[0].dstBinding = 0;
-    writes[0].dstArrayElement = 0;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].descriptorCount = 1;
-    writes[0].pBufferInfo = &buffer;
+/**
+ * @brief
+ * インデックス付き三角形の頂点バッファとインデックスバッファを準備します。
+ */
+void TextureMapping::PrepareVertices() {
+  // 頂点を設定します。
+  std::vector<Vertex> vertices = {{{-1.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+                                  {{1.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+                                  {{1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+                                  {{-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}};
 
-    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[1].dstSet = descriptors_[i];
-    writes[1].dstBinding = 1;
-    writes[1].dstArrayElement = 0;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    writes[1].descriptorCount = 1;
-    writes[1].pImageInfo = &image;
+  // インデックスを設定します。
+  std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
+  indexCount = static_cast<uint32_t>(indices.size());
 
-    vkUpdateDescriptorSets(instance.device,
-                           static_cast<uint32_t>(writes.size()), writes.data(),
-                           0, nullptr);
-  }
+  // 今回はステージングを行いません。
+  VK_CHECK_RESULT(vertexBuffer.Create(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                      vertices.data(),
+                                      sizeof(Vertex) * vertices.size()));
+  VK_CHECK_RESULT(indexBuffer.Create(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     indices.data(),
+                                     sizeof(uint32_t) * indices.size()));
+}
+
+/**
+ * @brief
+ * シェーダーユニフォームを含むユニフォームバッファブロックを準備して初期化します。
+ * @note
+ * OpenGLのような単一のユニフォームはVulkanに存在しなくなりました。すべてのシェーダーユニフォームはユニフォームバッファブロックを介して渡されます。
+ */
+void TextureMapping::PrepareUniformBuffers() {
+  VK_CHECK_RESULT(uniformBuffer.Create(device,
+                                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                       &ubo, sizeof(ubo)));
+  VK_CHECK_RESULT(uniformBuffer.Map(device));
+  UpdateUniformBuffers();
+}
+
+//*-----------------------------------------------------------------------------
+// Update
+//*-----------------------------------------------------------------------------
+
+void TextureMapping::UpdateUniformBuffers() {
+  // 行列をシェーダーに渡します。
+  ubo.model = glm::mat4(1.0f);
+  ubo.view = camera.GetViewMatrix();
+  ubo.proj = camera.GetProjectionMatrix();
+
+  // ユニフォームバッファへコピーします。
+  uniformBuffer.CopyTo(&ubo, sizeof(ubo));
 }

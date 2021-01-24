@@ -17,8 +17,6 @@
 #include "VK/Common.h"
 #include "VK/Initializer.h"
 #include "VK/Utils.h"
-#include "VK/Image/Image.h"
-#include "VK/Image/ImageView.h"
 
 //*-----------------------------------------------------------------------------
 // Init & Deinit
@@ -80,7 +78,7 @@ void VkBase::OnDestroy() {
   DestroyDepthStencil();
 
   vkDestroyPipelineCache(device, pipelineCache, nullptr);
-  vkDestroyCommandPool(device, cmdPool, nullptr);
+  vkDestroyCommandPool(device, commandPool, nullptr);
   DestroySyncObjects();
 
   device.Destroy();
@@ -236,8 +234,7 @@ VkPhysicalDevice VkBase::SelectPhysicalDevice() const {
 #endif
   std::multimap<float, VkPhysicalDevice> scores;
   for (const auto &dev : devices) {
-    scores.emplace(CalcDeviceScore(dev, GetEnabledDeviceExtensions()),
-                   dev);
+    scores.emplace(CalcDeviceScore(dev, GetEnabledDeviceExtensions()), dev);
   }
   BOOST_ASSERT_MSG(scores.rbegin()->first >= 0.0000001f,
                    "Failed to find suitable physical device");
@@ -263,7 +260,7 @@ void VkBase::CreateCommandPool() {
   create.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   create.queueFamilyIndex = swapchain.queueFamilyIndex;
   create.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  VK_CHECK_RESULT(vkCreateCommandPool(device, &create, nullptr, &cmdPool));
+  VK_CHECK_RESULT(vkCreateCommandPool(device, &create, nullptr, &commandPool));
 }
 
 void VkBase::CreateCommandBuffers() {
@@ -271,7 +268,7 @@ void VkBase::CreateCommandBuffers() {
 
   VkCommandBufferAllocateInfo alloc{};
   alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc.commandPool = cmdPool;
+  alloc.commandPool = commandPool;
   alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   alloc.commandBufferCount = static_cast<uint32_t>(drawCmdBuffers.size());
   VK_CHECK_RESULT(
@@ -279,7 +276,7 @@ void VkBase::CreateCommandBuffers() {
 }
 
 void VkBase::DestroyCommandBuffers() {
-  vkFreeCommandBuffers(device, cmdPool,
+  vkFreeCommandBuffers(device, commandPool,
                        static_cast<uint32_t>(drawCmdBuffers.size()),
                        drawCmdBuffers.data());
 }
@@ -332,12 +329,50 @@ void VkBase::DestroyDepthStencil() {
  */
 void VkBase::SetupDepthStencil() {
   const auto depthFormat = device.FindSupportedDepthFormat();
-  Image::Create(device, swapchain.extent.width, swapchain.extent.height, 0,
-                depthFormat, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthStencil.image, depthStencil.memory);
-  depthStencil.view = ImageView::Create(device, depthStencil.image, VK_IMAGE_VIEW_TYPE_2D,
-                           depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+  VkImageCreateInfo imageCreateInfo = Initializer::ImageCreateInfo();
+  imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+  imageCreateInfo.extent.width = swapchain.extent.width;
+  imageCreateInfo.extent.height = swapchain.extent.height;
+  imageCreateInfo.extent.depth = 1;
+  imageCreateInfo.mipLevels = 1;
+  imageCreateInfo.arrayLayers = 1;
+  imageCreateInfo.format = depthFormat;
+  imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+  imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+  imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  VK_CHECK_RESULT(
+      vkCreateImage(device, &imageCreateInfo, nullptr, &depthStencil.image));
+
+  VkMemoryRequirements memoryRequirements{};
+  vkGetImageMemoryRequirements(device, depthStencil.image, &memoryRequirements);
+  VkMemoryAllocateInfo alloc = Initializer::MemoryAllocateInfo();
+  alloc.allocationSize = memoryRequirements.size;
+  alloc.memoryTypeIndex = device.FindMemoryType(
+      memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  VK_CHECK_RESULT(
+      vkAllocateMemory(device, &alloc, nullptr, &depthStencil.memory));
+  VK_CHECK_RESULT(
+      vkBindImageMemory(device, depthStencil.image, depthStencil.memory, 0));
+
+  VkImageViewCreateInfo imageViewCreateInfo =
+      Initializer::ImageViewCreateInfo();
+  imageViewCreateInfo.image = depthStencil.image;
+  imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  imageViewCreateInfo.format = depthFormat;
+  imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+  imageViewCreateInfo.subresourceRange.levelCount = 1;
+  imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+  imageViewCreateInfo.subresourceRange.layerCount = 1;
+  imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+    imageViewCreateInfo.subresourceRange.aspectMask |=
+        VK_IMAGE_ASPECT_STENCIL_BIT;
+  }
+  VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCreateInfo, nullptr,
+                                    &depthStencil.view));
 }
 
 /**

@@ -74,7 +74,7 @@ protected:
    */
   Swapchain swapchain{};
   /** @brief コマンドバッファプール */
-  VkCommandPool cmdPool = VK_NULL_HANDLE;
+  VkCommandPool commandPool = VK_NULL_HANDLE;
   /** @brief 記述子セットプール */
   VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
   /** @brief フレームバッファに書き込むグローバルレンダーパス */

@@ -13,7 +13,5 @@ int main() {
   BOOST_ASSERT_MSG(config, "Failed to open Config.json!");
 
   App app(config.value());
-  std::unique_ptr<VkBase> tex = std::make_unique<TextureMapping>();
-
-  return app.Run(std::move(tex));
+  return app.Run(std::make_unique<TextureMapping>());
 }

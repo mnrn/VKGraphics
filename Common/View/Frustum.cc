@@ -68,9 +68,9 @@ BSphere Frustum::ComputeBSphere() const {
 }
 
 glm::mat4 Frustum::GetProjectionMatrix() const {
-  if (type_ == ProjectionType::Perspective) {
-    return glm::perspective(fovy_, ar_, near_, far_);
-  } else {
-    return glm::ortho(left_, right_, bottom_, top_, near_, far_);
-  }
+  glm::mat4 proj = (type_ == ProjectionType::Perspective)
+                       ? glm::perspective(fovy_, ar_, near_, far_)
+                       : glm::ortho(left_, right_, bottom_, top_, near_, far_);
+  proj[1][1] *= -1.0f;
+  return proj;
 }

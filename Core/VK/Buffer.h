@@ -1,47 +1,36 @@
+/**
+ * @brief デバイスメモリによってバックアップされたVulkan
+ * Bufferへのアクセスをカプセル化します。
+ */
+
 #pragma once
 
-/*
+#include <vector>
 #include <vulkan/vulkan.h>
 
-#include <vector>
-
-#include "VK/Instance.h"
+struct Device;
 
 struct Buffer {
-  static void Create(const Instance &instance, VkDeviceSize size,
-                     VkBufferUsageFlags usage, VkMemoryPropertyFlags memProp,
-                     VkBuffer &buffer, VkDeviceMemory &memory);
+  [[nodiscard]] VkResult Create(const Device &device, VkBufferUsageFlags bufferUsageFlags,
+              VkMemoryPropertyFlags memoryPropertyFlags,
+              void *data, VkDeviceSize size);
+  void Destroy(const Device& device) const;
 
-  static void Copy(const Instance &instance, VkBuffer src, VkBuffer dst,
-                   VkDeviceSize size);
-  static void CopyToImage(const Instance &instance, VkBuffer buffer,
-                          VkImage image, uint32_t width, uint32_t height);
+  [[nodiscard]] VkResult Map(const Device& device, VkDeviceSize size = VK_WHOLE_SIZE,
+                             VkDeviceSize offset = 0);
+  void Unmap(const Device& device);
+  [[nodiscard]] VkResult Bind(const Device& device, VkDeviceSize offset = 0) const;
 
-  template <typename T>
-  void Create(const Instance &instance, const std::vector<T> &src,
-              VkBufferUsageFlags usageFlag) {
-    VkDeviceSize size = sizeof(T) * src.size();
-    VkBuffer staging;
-    VkDeviceMemory stagingMemory;
-    Buffer::Create(instance, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                   staging, stagingMemory);
-    void *data;
-    vkMapMemory(instance.device, stagingMemory, 0, size, 0, &data);
-    std::memcpy(data, src.data(), size);
-    vkUnmapMemory(instance.device, stagingMemory);
-
-    Buffer::Create(instance, size, usageFlag | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer, memory);
-    Buffer::Copy(instance, staging, buffer, size);
-    vkDestroyBuffer(instance.device, staging, nullptr);
-    vkFreeMemory(instance.device, stagingMemory, nullptr);
-  }
-
-  void Destroy(const Instance &instance) const;
+  void SetupDescriptor(VkDeviceSize size = VK_WHOLE_SIZE,
+                       VkDeviceSize offset = 0);
+  void CopyTo(void *data, VkDeviceSize size) const;
+  [[nodiscard]] VkResult Flush(const Device& device, VkDeviceSize size = VK_WHOLE_SIZE,
+                               VkDeviceSize offset = 0) const;
+  [[nodiscard]] VkResult Invalidate(const Device& device, VkDeviceSize size = VK_WHOLE_SIZE,
+                                    VkDeviceSize offset = 0) const;
 
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkDescriptorBufferInfo descriptor{};
+  void *mapped = nullptr;
 };
- */
