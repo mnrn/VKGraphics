@@ -4,9 +4,8 @@ struct VSInput {
 };
 
 struct UniformBufferObject {
-    float4x4 model;
-    float4x4 view;
-    float4x4 proj;
+    float4x4 MVP;
+    float LodBias;
 };
 
 cbuffer ubo : register(b0) {
@@ -16,11 +15,13 @@ cbuffer ubo : register(b0) {
 struct VSOutput {
     float4 Pos : SV_POSITION;
     [[vk::location(0)]] float2 UV : TEXCOORD0;
+    [[vk::location(1)]] float LodBias : TEXCOORD1;
 };
 
 VSOutput main(VSInput input) {
     VSOutput output = (VSOutput)0;
-    output.Pos = mul(ubo.proj, mul(ubo.view, mul(ubo.model, float4(input.Pos, 1.0))));
+    output.Pos = mul(ubo.MVP, float4(input.Pos, 1.0));
     output.UV = input.UV;
+    output.LodBias = ubo.LodBias;
     return output;
 }

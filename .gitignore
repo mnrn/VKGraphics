@@ -12,8 +12,10 @@
 /[Dd]ata
 /[Ll]ogs
 /ssl
-/scripts
 /doc
 *.heap
 imgui.ini
 /cmake-build-*
+
+.env
+.venv

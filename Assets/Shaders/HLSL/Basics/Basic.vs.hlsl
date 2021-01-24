@@ -4,9 +4,9 @@ struct VSInput {
 };
 
 struct UniformBufferObject {
-    float4x4 model;
-    float4x4 view;
-    float4x4 proj;
+    float4x4 Model;
+    float4x4 View;
+    float4x4 Proj;
 };
 
 cbuffer ubo : register(b0) { 
@@ -20,7 +20,7 @@ struct VSOutput {
 
 VSOutput main(VSInput input) {
     VSOutput output = (VSOutput)0;
-    output.Pos = mul(ubo.proj, mul(ubo.view, mul(ubo.model, float4(input.Pos, 1.0))));
+    output.Pos = mul(ubo.Proj, mul(ubo.View, mul(ubo.Model, float4(input.Pos, 1.0))));
     output.Color = input.Color;
     return output;
 }

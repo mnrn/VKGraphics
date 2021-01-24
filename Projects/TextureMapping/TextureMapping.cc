@@ -368,9 +368,11 @@ void TextureMapping::PrepareUniformBuffers() {
 
 void TextureMapping::UpdateUniformBuffers() {
   // 行列をシェーダーに渡します。
-  ubo.model = glm::mat4(1.0f);
-  ubo.view = camera.GetViewMatrix();
-  ubo.proj = camera.GetProjectionMatrix();
+  const auto model = glm::mat4(1.0f);
+  const auto view = camera.GetViewMatrix();
+  const auto proj = camera.GetProjectionMatrix();
+  ubo.mvp = proj * view * model;
+  ubo.lodBias = 0.0f;
 
   // ユニフォームバッファへコピーします。
   uniformBuffer.CopyTo(&ubo, sizeof(ubo));
