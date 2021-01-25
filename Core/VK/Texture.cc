@@ -29,6 +29,68 @@ static stbi_uc *Load(const std::string &path, int &w, int &h,
 static void Free(unsigned char *data) { stbi_image_free(data); }
 } // namespace Pixels
 
+namespace Mipmaps {
+static void Generate(VkImage image, int32_t width, int32_t height,
+                     int32_t depth, uint32_t layerCount, uint32_t mipLevels,
+                     VkCommandBuffer commandBuffer, VkFilter blitFilter,
+                     VkImageLayout initialLayout, VkImageLayout finalLayout) {
+  VkImageSubresourceRange imageSubresourceRange{};
+  imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  imageSubresourceRange.baseMipLevel = 0;
+  imageSubresourceRange.levelCount = 1;
+  imageSubresourceRange.baseArrayLayer = 0;
+  imageSubresourceRange.layerCount = layerCount;
+
+  TransitionImageLayout(commandBuffer, image, imageSubresourceRange,
+                        initialLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+  for (uint32_t i = 1; i < mipLevels; i++) {
+    VkImageBlit imageBlit{};
+
+    // Source
+    imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageBlit.srcSubresource.layerCount = layerCount;
+    imageBlit.srcSubresource.mipLevel = i - 1;
+    imageBlit.srcOffsets[1].x = std::max(width >> i, 1);
+    imageBlit.srcOffsets[1].y = std::max(height >> i, 1);
+    imageBlit.srcOffsets[1].z = std::max(depth >> i, 1);
+
+    // Destination
+    imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageBlit.dstSubresource.layerCount = 1;
+    imageBlit.dstSubresource.mipLevel = i;
+    imageBlit.dstOffsets[1].x = std::max(width >> i, 1);
+    imageBlit.dstOffsets[1].y = std::max(height >> i, 1);
+    imageBlit.dstOffsets[1].z = std::max(depth >> i, 1);
+
+    VkImageSubresourceRange mipSubresourceRange{};
+    mipSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    mipSubresourceRange.baseMipLevel = i;
+    mipSubresourceRange.levelCount = 1;
+    mipSubresourceRange.layerCount = layerCount;
+
+    // 現在のミップレベルを転送先に送ります。
+    TransitionImageLayout(commandBuffer, image, mipSubresourceRange,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // 前のミップレベルからBlitします。
+    vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit,
+                   blitFilter);
+
+    // 現在のミップレベルを転送元に遷移させます。
+    TransitionImageLayout(commandBuffer, image, mipSubresourceRange,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  }
+
+  imageSubresourceRange.levelCount = mipLevels;
+  TransitionImageLayout(commandBuffer, image, imageSubresourceRange,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout);
+}
+} // namespace Mipmaps
+
 void Texture::Destroy(const Device &device) const {
   if (sampler != nullptr) {
     vkDestroySampler(device, sampler, nullptr);
@@ -38,10 +100,10 @@ void Texture::Destroy(const Device &device) const {
   vkFreeMemory(device, memory, nullptr);
 }
 
-void Texture2D::Load(const Device &device, const std::string &filepath,
-                     VkFormat format, VkQueue copyQueue,
-                     VkImageUsageFlags imageUsageFlags,
-                     VkImageLayout imageLayout, bool forceLinear) {
+void Texture::Load(const Device &device, const std::string &filepath,
+                   VkFormat format, VkQueue copyQueue,
+                   VkImageUsageFlags imageUsageFlags, VkImageLayout imageLayout,
+                   bool useStaging, bool generateMipmaps) {
   std::error_code ec;
   if (!std::filesystem::exists(filepath, ec)) {
     std::cerr << "Failed to load texture from " << filepath << std::endl;
@@ -58,18 +120,17 @@ void Texture2D::Load(const Device &device, const std::string &filepath,
   }
   const auto width = static_cast<uint32_t>(w);
   const auto height = static_cast<uint32_t>(h);
-  const auto mipLevels = 1;
-      //static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+  const auto mipLevels =
+      generateMipmaps ? static_cast<uint32_t>(
+                            std::floor(std::log2(std::max(width, height)))) +
+                            1
+                      : 1;
   const auto size = static_cast<VkDeviceSize>(w * h * 4);
 
   // 要求されたテクスチャ形式のデバイスプロパティを取得します。
   VkFormatProperties formatProperties;
   vkGetPhysicalDeviceFormatProperties(device.physicalDevice, format,
                                       &formatProperties);
-
-  // 要求された場合にのみ線形タイリングを使用します。
-  // 線形タイリングのサポートはほとんど制限されているため、代わりに最適なタイリングを使用することをおすすめします。
-  VkBool32 useStaging = !forceLinear;
 
   // テクスチャの読み込みに別のコマンドバッファを使用します。
   VkCommandBuffer copyCommand =
@@ -137,13 +198,18 @@ void Texture2D::Load(const Device &device, const std::string &filepath,
 
     // ステージングバッファからコピーします。
     vkCmdCopyBufferToImage(copyCommand, stagingBuffer, image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           1,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                            &bufferImageCopyRegion);
 
-    // すべてコピーされた後、テクスチャのイメージレイアウトを変更します。
-    TransitionImageLayout(copyCommand, image, imageSubresourceRange,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageLayout);
+    if (generateMipmaps) {
+      Mipmaps::Generate(image, width, height, 1, 1, mipLevels, copyCommand,
+                        VK_FILTER_LINEAR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        imageLayout);
+    } else {
+      // すべてコピーされた後、テクスチャのイメージレイアウトを変更します。
+      TransitionImageLayout(copyCommand, image, imageSubresourceRange,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageLayout);
+    }
     device.FlushCommandBuffer(copyCommand, copyQueue);
 
     // ステージングリソースを破棄します。
@@ -233,8 +299,11 @@ void Texture2D::Load(const Device &device, const std::string &filepath,
   imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
   imageViewCreateInfo.format = format;
   imageViewCreateInfo.components = {
-      VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
-      VK_COMPONENT_SWIZZLE_A};
+      VK_COMPONENT_SWIZZLE_R,
+      VK_COMPONENT_SWIZZLE_G,
+      VK_COMPONENT_SWIZZLE_B,
+      VK_COMPONENT_SWIZZLE_A,
+  };
   imageViewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0,
                                           1};
   // 線形タイリングは通常ミップマップをサポートしません。
