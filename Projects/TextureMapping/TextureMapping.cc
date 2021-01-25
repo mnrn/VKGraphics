@@ -9,7 +9,7 @@
 
 #include "VK/Common.h"
 #include "VK/Initializer.h"
-#include "VK/Shader.h"
+#include "VK/Utils.h"
 
 struct Vertex {
   glm::vec3 pos;
@@ -243,11 +243,11 @@ void TextureMapping::SetupPipelines() {
   // パイプラインシェーダーステージ情報を設定します。
   std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
   shaderStages[0] =
-      Shader::Create(device, config["VertexShader"].get<std::string>(),
-                     VK_SHADER_STAGE_VERTEX_BIT);
+      CreateShader(device, config["VertexShader"].get<std::string>(),
+                   VK_SHADER_STAGE_VERTEX_BIT);
   shaderStages[1] =
-      Shader::Create(device, config["FragmentShader"].get<std::string>(),
-                     VK_SHADER_STAGE_FRAGMENT_BIT);
+      CreateShader(device, config["FragmentShader"].get<std::string>(),
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
   pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
   pipelineCreateInfo.pStages = shaderStages.data();
 

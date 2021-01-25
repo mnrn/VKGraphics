@@ -11,7 +11,6 @@
 #include "VK/Common.h"
 #include "VK/Device.h"
 #include "VK/Initializer.h"
-#include "VK/Shader.h"
 #include "VK/Utils.h"
 
 #define UI_OVERLAY_VERTEX_SHADER_PATH                                          \
@@ -19,7 +18,8 @@
 #define UI_OVERLAY_FRAGMENT_SHADER_PATH                                        \
   "./Assets/Shaders/GLSL/SPIR-V/UI/UIOverlay.fs.spv"
 
-Gui::Gui(const Device &device, VkQueue queue, VkPipelineCache pipelineCache, VkRenderPass renderPass) {
+Gui::Gui(const Device &device, VkQueue queue, VkPipelineCache pipelineCache,
+         VkRenderPass renderPass) {
   ImGui::CreateContext();
   ImGui::StyleColorsClassic();
 
@@ -356,10 +356,10 @@ void Gui::SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
       });
 
   std::vector<VkPipelineShaderStageCreateInfo> shaderStages = {
-      Shader::Create(device, UI_OVERLAY_VERTEX_SHADER_PATH,
-                     VK_SHADER_STAGE_VERTEX_BIT),
-      Shader::Create(device, UI_OVERLAY_FRAGMENT_SHADER_PATH,
-                     VK_SHADER_STAGE_FRAGMENT_BIT),
+      CreateShader(device, UI_OVERLAY_VERTEX_SHADER_PATH,
+                   VK_SHADER_STAGE_VERTEX_BIT),
+      CreateShader(device, UI_OVERLAY_FRAGMENT_SHADER_PATH,
+                   VK_SHADER_STAGE_FRAGMENT_BIT),
   };
 
   std::vector<VkVertexInputBindingDescription> vertexInputBindingDescriptions =
@@ -391,7 +391,8 @@ void Gui::SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
   graphicsPipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
   graphicsPipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
   graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-  graphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+  graphicsPipelineCreateInfo.stageCount =
+      static_cast<uint32_t>(shaderStages.size());
   graphicsPipelineCreateInfo.pStages = shaderStages.data();
   graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
   graphicsPipelineCreateInfo.subpass = subpass;

@@ -7,6 +7,11 @@
 
 struct Device;
 
+VkPipelineShaderStageCreateInfo
+CreateShader(const Device& device, const std::string &filepath,
+       VkShaderStageFlagBits stage,
+       VkSpecializationInfo *specialization = nullptr);
+
 VkResult
 CreateImageView(const Device &device, VkImageView &view, VkImage image,
                 VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D,
