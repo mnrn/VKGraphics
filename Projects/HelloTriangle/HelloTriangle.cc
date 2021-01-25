@@ -137,9 +137,7 @@ void HelloTriangle::BuildCommandBuffers() {
   }
 }
 
-void HelloTriangle::ViewChanged() {
-  UpdateUniformBuffers();
-}
+void HelloTriangle::ViewChanged() { UpdateUniformBuffers(); }
 
 //*-----------------------------------------------------------------------------
 // Setup
@@ -178,7 +176,7 @@ void HelloTriangle::SetupDescriptorSetLayout() {
 void HelloTriangle::SetupPipelines() {
   // パイプラインに使用されるレイアウトとレンダーパスを指定します。
   VkGraphicsPipelineCreateInfo pipelineCreateInfo =
-      Initializer::PipelineCreateInfo(pipelineLayout, renderPass);
+      Initializer::GraphicsPipelineCreateInfo(pipelineLayout, renderPass);
 
   // 入力アセンブリステートはプリミティブがどのようにアセンブルされるかを記述します。
   // このパイプラインでは、頂点データを三角形リストとしてアセンブルします。
@@ -254,10 +252,12 @@ void HelloTriangle::SetupPipelines() {
   vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
   std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
-  shaderStages[0] = Shader::Create(config["VertexShader"].get<std::string>(),
-                                   device, VK_SHADER_STAGE_VERTEX_BIT);
-  shaderStages[1] = Shader::Create(config["FragmentShader"].get<std::string>(),
-                                   device, VK_SHADER_STAGE_FRAGMENT_BIT);
+  shaderStages[0] =
+      Shader::Create(device, config["VertexShader"].get<std::string>(),
+                     VK_SHADER_STAGE_VERTEX_BIT);
+  shaderStages[1] =
+      Shader::Create(device, config["FragmentShader"].get<std::string>(),
+                     VK_SHADER_STAGE_FRAGMENT_BIT);
 
   // パイプラインシェーダーステージ情報を設定します。
   pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());

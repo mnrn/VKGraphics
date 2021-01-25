@@ -6,6 +6,7 @@
 #include <variant>
 
 #include "VK/Common.h"
+#include "VK/Device.h"
 
 #define SHADER_ENTRY_POINT "main"
 
@@ -25,8 +26,7 @@ ReadFile(const std::string &filename) {
   return std::move(buffer);
 }
 
-VkPipelineShaderStageCreateInfo Create(const std::string &filepath,
-                                       VkDevice device,
+VkPipelineShaderStageCreateInfo Create(const Device& device, const std::string &filepath,
                                        VkShaderStageFlagBits stage,
                                        VkSpecializationInfo *specialization) {
   const auto v = ReadFile(filepath);

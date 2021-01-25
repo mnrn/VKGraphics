@@ -12,8 +12,7 @@ struct Device;
 
 struct Buffer {
   [[nodiscard]] VkResult Create(const Device &device, VkBufferUsageFlags bufferUsageFlags,
-              VkMemoryPropertyFlags memoryPropertyFlags,
-              void *data, VkDeviceSize size);
+              VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize size, void *data = nullptr);
   void Destroy(const Device& device) const;
 
   [[nodiscard]] VkResult Map(const Device& device, VkDeviceSize size = VK_WHOLE_SIZE,

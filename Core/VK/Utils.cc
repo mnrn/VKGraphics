@@ -14,6 +14,56 @@
 #pragma clang diagnostic ignored "-Wswitch-enum"
 #endif
 
+VkResult CreateImageView(const Device &device, VkImageView &view, VkImage image,
+                         VkImageViewType type, VkFormat format,
+                         VkImageAspectFlags aspectFlags, uint32_t baseMipLevel,
+                         uint32_t mipLevels, uint32_t baseArraySlice,
+                         uint32_t arraySize, VkComponentSwizzle r,
+                         VkComponentSwizzle g, VkComponentSwizzle b,
+                         VkComponentSwizzle a) {
+  VkImageViewCreateInfo imageViewCreateInfo =
+      Initializer::ImageViewCreateInfo();
+  imageViewCreateInfo.image = image;
+  imageViewCreateInfo.viewType = type;
+  imageViewCreateInfo.format = format;
+  imageViewCreateInfo.components.r = r;
+  imageViewCreateInfo.components.g = g;
+  imageViewCreateInfo.components.b = b;
+  imageViewCreateInfo.components.a = a;
+  imageViewCreateInfo.subresourceRange.aspectMask = aspectFlags;
+  imageViewCreateInfo.subresourceRange.levelCount = mipLevels;
+  imageViewCreateInfo.subresourceRange.baseMipLevel = baseMipLevel;
+  imageViewCreateInfo.subresourceRange.layerCount = arraySize;
+  imageViewCreateInfo.subresourceRange.baseArrayLayer = baseArraySlice;
+  return vkCreateImageView(device, &imageViewCreateInfo, nullptr, &view);
+}
+
+VkResult CreateSampler(
+    const Device &device, VkSampler &sampler, VkFilter magFilter,
+    VkFilter minFilter, VkBool32 compareEnable, VkCompareOp compareOp,
+    VkSamplerAddressMode addressModeU, VkSamplerAddressMode addressModeV,
+    VkSamplerAddressMode addressModeW, VkSamplerMipmapMode mipmapMode,
+    float minLod, float maxLod, float mipLodBias, VkBool32 anisotropyEnable,
+    float maxAnisotropy, VkBorderColor borderColor) {
+  VkSamplerCreateInfo samplerCreateInfo = Initializer::SamplerCreateInfo();
+  samplerCreateInfo.minFilter = minFilter;
+  samplerCreateInfo.magFilter = magFilter;
+  samplerCreateInfo.compareEnable = compareEnable;
+  samplerCreateInfo.compareOp = compareOp;
+  samplerCreateInfo.addressModeU = addressModeU;
+  samplerCreateInfo.addressModeV = addressModeV;
+  samplerCreateInfo.addressModeW = addressModeW;
+  samplerCreateInfo.maxAnisotropy = maxAnisotropy;
+  samplerCreateInfo.maxLod = maxLod;
+  samplerCreateInfo.minLod = minLod;
+  samplerCreateInfo.mipLodBias = mipLodBias;
+  samplerCreateInfo.mipmapMode = mipmapMode;
+  samplerCreateInfo.borderColor = borderColor;
+  samplerCreateInfo.anisotropyEnable = anisotropyEnable;
+  samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+  return vkCreateSampler(device, &samplerCreateInfo, nullptr, &sampler);
+}
+
 void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image,
                            VkImageSubresourceRange imageSubresourceRange,
                            VkImageLayout oldImageLayout,

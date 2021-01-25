@@ -494,8 +494,8 @@ PipelineTessellationStateCreateInfo(uint32_t patchControlPoints) {
 }
 
 [[maybe_unused]] inline VkGraphicsPipelineCreateInfo
-PipelineCreateInfo(VkPipelineLayout layout, VkRenderPass renderPass,
-                   VkPipelineCreateFlags flags = 0) {
+GraphicsPipelineCreateInfo(VkPipelineLayout layout, VkRenderPass renderPass,
+                           VkPipelineCreateFlags flags = 0) {
   VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
   pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineCreateInfo.layout = layout;
@@ -507,7 +507,8 @@ PipelineCreateInfo(VkPipelineLayout layout, VkRenderPass renderPass,
 }
 
 [[maybe_unused]] inline VkGraphicsPipelineCreateInfo
-PipelineCreateInfo(VkPipelineLayout layout, VkPipelineCreateFlags flags = 0) {
+GraphicsPipelineCreateInfo(VkPipelineLayout layout,
+                           VkPipelineCreateFlags flags = 0) {
   VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
   pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineCreateInfo.layout = layout;
@@ -515,12 +516,23 @@ PipelineCreateInfo(VkPipelineLayout layout, VkPipelineCreateFlags flags = 0) {
   return pipelineCreateInfo;
 }
 
-[[maybe_unused]] inline VkGraphicsPipelineCreateInfo PipelineCreateInfo() {
+[[maybe_unused]] inline VkGraphicsPipelineCreateInfo
+GraphicsPipelineCreateInfo() {
   VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
   pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineCreateInfo.basePipelineIndex = -1;
   pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
   return pipelineCreateInfo;
+}
+
+[[maybe_unused]] inline VkPushConstantRange
+PushConstantRange(VkShaderStageFlags stageFlags, uint32_t size,
+                  uint32_t offset) {
+  VkPushConstantRange pushConstantRange{};
+  pushConstantRange.stageFlags = stageFlags;
+  pushConstantRange.size = size;
+  pushConstantRange.offset = offset;
+  return pushConstantRange;
 }
 
 } // namespace Initializer

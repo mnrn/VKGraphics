@@ -106,10 +106,10 @@ VkResult Buffer::Invalidate(const Device &device, const VkDeviceSize size,
  */
 VkResult Buffer::Create(const Device &device,
                         VkBufferUsageFlags bufferUsageFlags,
-                        VkMemoryPropertyFlags memoryPropertyFlags, void *data,
-                        VkDeviceSize size) {
-  VkResult result = device.CreateBuffer(bufferUsageFlags, memoryPropertyFlags, size,
-                             &buffer, &memory, data);
+                        VkMemoryPropertyFlags memoryPropertyFlags,
+                        VkDeviceSize size, void *data) {
+  VkResult result = device.CreateBuffer(bufferUsageFlags, memoryPropertyFlags,
+                                        size, &buffer, &memory, data);
   SetupDescriptor(size);
   return result;
 }

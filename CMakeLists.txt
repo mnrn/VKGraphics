@@ -57,6 +57,7 @@ function(build TARGET_NAME)
         *.cc
         Core/VK/*.cc
         Common/View/*cc
+        third-party/imgui/*.cpp
         ${PROJECTS_DIR_NAME}/${TARGET_NAME}/*.cc
         )
     set(MAIN_CC ${TARGET_NAME}/${TARGET_NAME}/Main.cc)

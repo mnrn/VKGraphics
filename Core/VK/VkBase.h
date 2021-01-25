@@ -16,6 +16,7 @@
 
 #include "VK/Debug.h"
 #include "VK/Device.h"
+#include "VK/Gui.h"
 #include "VK/Swapchain.h"
 
 class VkBase : private boost::noncopyable {
@@ -37,6 +38,10 @@ protected:
 
   virtual void OnPostInit();
   virtual void OnPreDestroy();
+
+  virtual void OnUpdateUIOverlay(float);
+  virtual void OnUpdateUIOverlay(const Gui &uiOverlay);
+  void DrawUI(VkCommandBuffer commandBuffer);
 
   void CreateSwapchain(int width, int height);
   void CreatePipelineCache();
@@ -108,6 +113,9 @@ protected:
     VkImageView view = VK_NULL_HANDLE;
   } depthStencil;
 
+  std::optional<Gui> safeUIOverlay = std::nullopt;
+  std::optional<DebugMessenger> safeDebugMessenger = std::nullopt;
+
   GLFWwindow *window = nullptr;
   nlohmann::json config{};
   bool isFramebufferResized = false;
@@ -115,10 +123,6 @@ protected:
   std::vector<const char *> validationLayers_ = {
       "VK_LAYER_KHRONOS_validation",
   };
-
-#if !defined(NDEBUG)
-  DebugMessenger debugMessenger{};
-#endif
 
 #if defined(NDEBUG)
   const bool isEnableValidationLayers_ = false;

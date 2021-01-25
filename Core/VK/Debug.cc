@@ -45,6 +45,10 @@ Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 }
 } // namespace Debug
 
+DebugMessenger::DebugMessenger(VkInstance instance) {
+  Setup(instance);
+}
+
 //*-----------------------------------------------------------------------------
 // Create & Destroy
 //*-----------------------------------------------------------------------------

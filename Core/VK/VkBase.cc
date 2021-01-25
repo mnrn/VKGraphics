@@ -11,6 +11,7 @@
 #include "VkBase.h"
 
 #include <boost/assert.hpp>
+#include <imgui.h>
 #include <map>
 #include <spdlog/spdlog.h>
 
@@ -30,7 +31,7 @@ void VkBase::OnInit(const nlohmann::json &conf, GLFWwindow *hwnd) {
 
   CreateInstance(appName.c_str());
 #if !defined(NDEBUG)
-  debugMessenger.Setup(instance);
+  safeDebugMessenger = std::make_optional<DebugMessenger>(instance);
 #endif
   VkPhysicalDevice physicalDevice = SelectPhysicalDevice();
   swapchain.Init(instance, window, physicalDevice);
@@ -58,12 +59,21 @@ void VkBase::OnPostInit() {
   SetupRenderPass();
   CreatePipelineCache();
   SetupFramebuffers();
+
+  if (config.contains("EnableUIOverlay")) {
+    safeUIOverlay =
+        std::make_optional<Gui>(device, queue, pipelineCache, renderPass);
+  }
 }
 
 void VkBase::OnPreDestroy() {}
 
 void VkBase::OnDestroy() {
   OnPreDestroy();
+
+  if (safeUIOverlay) {
+    safeUIOverlay.value().OnDestroy(device);
+  }
 
   swapchain.Destroy(instance, device);
   if (descriptorPool != VK_NULL_HANDLE) {
@@ -82,9 +92,9 @@ void VkBase::OnDestroy() {
   DestroySyncObjects();
 
   device.Destroy();
-#if !defined(NDEBUG)
-  debugMessenger.Cleanup(instance);
-#endif
+  if (safeDebugMessenger) {
+    safeDebugMessenger.value().Cleanup(instance);
+  }
   vkDestroyInstance(instance, nullptr);
 }
 
@@ -93,6 +103,31 @@ void VkBase::OnDestroy() {
 //*-----------------------------------------------------------------------------
 
 void VkBase::OnUpdate(float) {}
+
+void VkBase::OnUpdateUIOverlay(float) {
+  if (safeUIOverlay == std::nullopt) {
+    return;
+  }
+
+  auto uiOverlay = safeUIOverlay.value();
+  ImGuiIO &io = ImGui::GetIO();
+  io.DisplaySize = ImVec2(static_cast<float>(swapchain.extent.width),
+                          static_cast<float>(swapchain.extent.height));
+
+  ImGui::NewFrame();
+  ImGui::SetNextWindowPos(ImVec2(10, 10));
+  ImGui::Begin(config["AppName"].get<std::string>().c_str());
+
+  ImGui::End();
+  ImGui::Render();
+
+  if (uiOverlay.OnUpdate(device) || uiOverlay.updated) {
+    BuildCommandBuffers();
+    uiOverlay.updated = false;
+  }
+}
+
+void VkBase::OnUpdateUIOverlay(const Gui &uiOverlay) {}
 
 //*-----------------------------------------------------------------------------
 // Render
@@ -134,6 +169,21 @@ void VkBase::SubmitFrame() {
   VK_CHECK_RESULT(vkQueueWaitIdle(queue));
 }
 
+void VkBase::DrawUI(VkCommandBuffer commandBuffer) {
+  if (safeUIOverlay == std::nullopt) {
+    return;
+  }
+  const auto viewport = Initializer::Viewport(
+      static_cast<float>(swapchain.extent.width),
+      static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
+  const auto scissor = Initializer::Rect2D(swapchain.extent.width,
+                                           swapchain.extent.height, 0, 0);
+  vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+  vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+  safeUIOverlay.value().OnRender(commandBuffer);
+}
+
 void VkBase::WaitIdle() const { vkDeviceWaitIdle(device); }
 
 //*-----------------------------------------------------------------------------
@@ -168,6 +218,10 @@ void VkBase::ResizeWindow() {
     vkDestroyFramebuffer(device, framebuffer, nullptr);
   }
   SetupFramebuffers();
+
+  if (safeUIOverlay) {
+    safeUIOverlay.value().OnResize(width, height);
+  }
 
   // Frame buffersの再生成後にCommand buffersも再生成する必要があります。
   DestroyCommandBuffers();

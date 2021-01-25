@@ -238,14 +238,16 @@ void TextureMapping::SetupPipelines() {
 
   // パイプラインに使用されるレイアウトとレンダーパスを指定します。
   VkGraphicsPipelineCreateInfo pipelineCreateInfo =
-      Initializer::PipelineCreateInfo(pipelineLayout, renderPass);
+      Initializer::GraphicsPipelineCreateInfo(pipelineLayout, renderPass);
 
   // パイプラインシェーダーステージ情報を設定します。
   std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
-  shaderStages[0] = Shader::Create(config["VertexShader"].get<std::string>(),
-                                   device, VK_SHADER_STAGE_VERTEX_BIT);
-  shaderStages[1] = Shader::Create(config["FragmentShader"].get<std::string>(),
-                                   device, VK_SHADER_STAGE_FRAGMENT_BIT);
+  shaderStages[0] =
+      Shader::Create(device, config["VertexShader"].get<std::string>(),
+                     VK_SHADER_STAGE_VERTEX_BIT);
+  shaderStages[1] =
+      Shader::Create(device, config["FragmentShader"].get<std::string>(),
+                     VK_SHADER_STAGE_FRAGMENT_BIT);
   pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
   pipelineCreateInfo.pStages = shaderStages.data();
 
@@ -337,13 +339,13 @@ void TextureMapping::PrepareVertices() {
   VK_CHECK_RESULT(vertexBuffer.Create(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                      vertices.data(),
-                                      sizeof(Vertex) * vertices.size()));
+                                      sizeof(Vertex) * vertices.size(),
+                                      vertices.data()));
   VK_CHECK_RESULT(indexBuffer.Create(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     indices.data(),
-                                     sizeof(uint32_t) * indices.size()));
+                                     sizeof(uint32_t) * indices.size(),
+                                     indices.data()));
 }
 
 /**
@@ -357,7 +359,7 @@ void TextureMapping::PrepareUniformBuffers() {
                                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       &ubo, sizeof(ubo)));
+                                       sizeof(ubo), &ubo));
   VK_CHECK_RESULT(uniformBuffer.Map(device));
   UpdateUniformBuffers();
 }

@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 
+struct Device;
+
 namespace Shader {
 VkPipelineShaderStageCreateInfo
-Create(const std::string &filepath, VkDevice device,
+Create(const Device& device, const std::string &filepath,
        VkShaderStageFlagBits stage,
        VkSpecializationInfo *specialization = nullptr);
 }
