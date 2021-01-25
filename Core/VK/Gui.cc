@@ -200,6 +200,7 @@ void Gui::SetupResources(const Device &device, VkQueue queue) {
   VkImageViewCreateInfo imageViewCreateInfo =
       Initializer::ImageViewCreateInfo();
   imageViewCreateInfo.image = font.image;
+  imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
   imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
   imageViewCreateInfo.subresourceRange.levelCount = 1;
   imageViewCreateInfo.subresourceRange.layerCount = 1;
@@ -349,11 +350,12 @@ void Gui::SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
   VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo =
       Initializer::PipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
 
+  std::vector<VkDynamicState> dynamicStates = {
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR,
+  };
   VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo =
-      Initializer::PipelineDynamicStateCreateInfo({
-          VK_DYNAMIC_STATE_VIEWPORT,
-          VK_DYNAMIC_STATE_SCISSOR,
-      });
+      Initializer::PipelineDynamicStateCreateInfo(dynamicStates);
 
   std::vector<VkPipelineShaderStageCreateInfo> shaderStages = {
       CreateShader(device, UI_OVERLAY_VERTEX_SHADER_PATH,

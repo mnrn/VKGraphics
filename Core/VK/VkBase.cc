@@ -60,7 +60,7 @@ void VkBase::OnPostInit() {
   CreatePipelineCache();
   SetupFramebuffers();
 
-  if (config.contains("EnableUIOverlay")) {
+  if (config.contains("UIOverlay") && config["UIOverlay"]) {
     safeUIOverlay =
         std::make_optional<Gui>(device, queue, pipelineCache, renderPass);
   }
