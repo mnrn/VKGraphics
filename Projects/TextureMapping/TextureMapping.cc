@@ -386,7 +386,7 @@ void TextureMapping::UpdateUniformBuffers() {
 void TextureMapping::OnUpdateUIOverlay() {
   if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
     if (ImGui::SliderFloat("Lod bias", &ubo.lodBias, 0.0f,
-                           static_cast<float>(texture.mipLevels))) {
+                           2.0f)) {
       UpdateUniformBuffers();
     }
   }

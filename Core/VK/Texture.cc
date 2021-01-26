@@ -148,15 +148,22 @@ void Texture::Load(const Device &device, const std::string &filepath,
                             size, &stagingBuffer, &stagingMemory, pixels));
 
     // バッファコピー領域を設定します。
-    VkBufferImageCopy bufferImageCopyRegion{};
-    bufferImageCopyRegion.imageSubresource.aspectMask =
-        VK_IMAGE_ASPECT_COLOR_BIT;
-    bufferImageCopyRegion.imageSubresource.mipLevel = 0;
-    bufferImageCopyRegion.imageSubresource.baseArrayLayer = 0;
-    bufferImageCopyRegion.imageSubresource.layerCount = 1;
-    bufferImageCopyRegion.imageExtent.width = width;
-    bufferImageCopyRegion.imageExtent.height = height;
-    bufferImageCopyRegion.imageExtent.depth = 1;
+    std::vector<VkBufferImageCopy> bufferImageCopyRegions{};
+    for (uint32_t i = 0; i < mipLevels; i++) {
+      VkDeviceSize offset = 0;
+      VkBufferImageCopy bufferImageCopyRegion{};
+      bufferImageCopyRegion.imageSubresource.aspectMask =
+          VK_IMAGE_ASPECT_COLOR_BIT;
+      bufferImageCopyRegion.imageSubresource.mipLevel = i;
+      bufferImageCopyRegion.imageSubresource.baseArrayLayer = 0;
+      bufferImageCopyRegion.imageSubresource.layerCount = 1;
+      bufferImageCopyRegion.imageExtent.width = std::max(width >> i, 1u);
+      bufferImageCopyRegion.imageExtent.height = std::max(height >> i, 1u);
+      bufferImageCopyRegion.imageExtent.depth = 1;
+      bufferImageCopyRegion.bufferOffset = offset;
+      bufferImageCopyRegions.emplace_back(bufferImageCopyRegion);
+    }
+
 
     // 最適なタイルターゲット画像を生成します。
     VkImageCreateInfo imageCreateInfo = Initializer::ImageCreateInfo();
@@ -201,8 +208,8 @@ void Texture::Load(const Device &device, const std::string &filepath,
 
     // ステージングバッファからコピーします。
     vkCmdCopyBufferToImage(copyCommand, stagingBuffer, image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                           &bufferImageCopyRegion);
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(bufferImageCopyRegions.size()),
+                           bufferImageCopyRegions.data());
 
     if (generateMipmaps) {
       Mipmaps::Generate(image, width, height, 1, 1, mipLevels, copyCommand,
