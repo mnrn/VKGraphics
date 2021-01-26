@@ -79,7 +79,7 @@ static void Generate(VkImage image, int32_t width, int32_t height,
                    image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit,
                    blitFilter);
 
-    // 現在のミップレベルを転送元に遷移させます。
+    // 次のループに備え、現在のミップレベルを転送元に遷移させます。
     TransitionImageLayout(commandBuffer, image, mipSubresourceRange,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
