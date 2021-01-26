@@ -130,7 +130,7 @@ void TextureMapping::ViewChanged() { UpdateUniformBuffers(); }
 //*-----------------------------------------------------------------------------
 
 void TextureMapping::LoadAssets() {
-  texture.Load(device, "./Assets/Textures/png/Brick/ruin_wall_01.png",
+  texture.Load(device, "./Assets/Textures/ktx/Brick/ruin_wall_01.ktx",
                VK_FORMAT_R8G8B8A8_SRGB, queue);
 }
 
@@ -386,7 +386,7 @@ void TextureMapping::UpdateUniformBuffers() {
 void TextureMapping::OnUpdateUIOverlay() {
   if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
     if (ImGui::SliderFloat("Lod bias", &ubo.lodBias, 0.0f,
-                           2.0f)) {
+                           static_cast<float>(texture.mipLevels))) {
       UpdateUniformBuffers();
     }
   }

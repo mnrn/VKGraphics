@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <gli/gli.hpp>
 #include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -19,18 +20,18 @@
 #include "VK/Utils.h"
 
 namespace Pixels {
-static stbi_uc *Load(const std::string &path, int &w, int &h,
+[[maybe_unused]] static stbi_uc *Load(const std::string &path, int &w, int &h,
                      bool flip = true) {
   int bytesPerPix;
   stbi_set_flip_vertically_on_load(flip);
   return stbi_load(path.c_str(), &w, &h, &bytesPerPix, 4);
 }
 
-static void Free(unsigned char *data) { stbi_image_free(data); }
+[[maybe_unused]] static void Free(unsigned char *data) { stbi_image_free(data); }
 } // namespace Pixels
 
 namespace Mipmaps {
-static void Generate(VkImage image, int32_t width, int32_t height,
+[[maybe_unused]] static void Generate(VkImage image, int32_t width, int32_t height,
                      int32_t depth, uint32_t layerCount, uint32_t mipLevels,
                      VkCommandBuffer commandBuffer, VkFilter blitFilter,
                      VkImageLayout initialLayout, VkImageLayout finalLayout) {
@@ -103,7 +104,7 @@ void Texture::Destroy(const Device &device) const {
 void Texture::Load(const Device &device, const std::string &filepath,
                    VkFormat format, VkQueue copyQueue,
                    VkImageUsageFlags imageUsageFlags, VkImageLayout imageLayout,
-                   bool useStaging, bool generateMipmaps) {
+                   bool useStaging) {
   std::error_code ec;
   if (!std::filesystem::exists(filepath, ec)) {
     std::cerr << "Failed to load texture from " << filepath << std::endl;
@@ -112,20 +113,11 @@ void Texture::Load(const Device &device, const std::string &filepath,
     return;
   }
 
-  int w, h;
-  stbi_uc *pixels = Pixels::Load(filepath, w, h);
-  if (pixels == nullptr) {
-    std::cerr << "Failed to load " << filepath << std::endl;
-    BOOST_ASSERT_MSG(pixels != nullptr, "Failed to load texture!");
-  }
-  width = static_cast<uint32_t>(w);
-  height = static_cast<uint32_t>(h);
-  mipLevels =
-      generateMipmaps ? static_cast<uint32_t>(
-                            std::floor(std::log2(std::max(width, height)))) +
-                            1
-                      : 1;
-  const auto size = static_cast<VkDeviceSize>(w * h * 4);
+  gli::texture2d tex2d(gli::load(filepath.c_str()));
+  BOOST_ASSERT_MSG(!tex2d.empty(), "Failed to load texture!");
+  width = static_cast<uint32_t>(tex2d[0].extent().x);
+  height = static_cast<uint32_t>(tex2d[0].extent().y);
+  mipLevels = static_cast<uint32_t>(tex2d.levels());
 
   // 要求されたテクスチャ形式のデバイスプロパティを取得します。
   VkFormatProperties formatProperties;
@@ -141,29 +133,31 @@ void Texture::Load(const Device &device, const std::string &filepath,
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingMemory;
 
-    VK_CHECK_RESULT(
-        device.CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            size, &stagingBuffer, &stagingMemory, pixels));
+    VK_CHECK_RESULT(device.CreateBuffer(
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        tex2d.size(), &stagingBuffer, &stagingMemory, tex2d.data()));
 
     // バッファコピー領域を設定します。
     std::vector<VkBufferImageCopy> bufferImageCopyRegions{};
+    uint32_t offset = 0;
     for (uint32_t i = 0; i < mipLevels; i++) {
-      VkDeviceSize offset = 0;
       VkBufferImageCopy bufferImageCopyRegion{};
       bufferImageCopyRegion.imageSubresource.aspectMask =
           VK_IMAGE_ASPECT_COLOR_BIT;
       bufferImageCopyRegion.imageSubresource.mipLevel = i;
       bufferImageCopyRegion.imageSubresource.baseArrayLayer = 0;
       bufferImageCopyRegion.imageSubresource.layerCount = 1;
-      bufferImageCopyRegion.imageExtent.width = std::max(width >> i, 1u);
-      bufferImageCopyRegion.imageExtent.height = std::max(height >> i, 1u);
+      bufferImageCopyRegion.imageExtent.width =
+          static_cast<uint32_t>(tex2d[i].extent().x);
+      bufferImageCopyRegion.imageExtent.height =
+          static_cast<uint32_t>(tex2d[i].extent().y);
       bufferImageCopyRegion.imageExtent.depth = 1;
       bufferImageCopyRegion.bufferOffset = offset;
       bufferImageCopyRegions.emplace_back(bufferImageCopyRegion);
+      offset += static_cast<uint32_t>(tex2d[i].size());
     }
-
 
     // 最適なタイルターゲット画像を生成します。
     VkImageCreateInfo imageCreateInfo = Initializer::ImageCreateInfo();
@@ -179,9 +173,6 @@ void Texture::Load(const Device &device, const std::string &filepath,
     imageCreateInfo.usage = imageUsageFlags;
     if ((imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
       imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    }
-    if (generateMipmaps) {
-        imageCreateInfo.usage |= (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     }
     VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &image));
 
@@ -208,18 +199,13 @@ void Texture::Load(const Device &device, const std::string &filepath,
 
     // ステージングバッファからコピーします。
     vkCmdCopyBufferToImage(copyCommand, stagingBuffer, image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(bufferImageCopyRegions.size()),
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           static_cast<uint32_t>(bufferImageCopyRegions.size()),
                            bufferImageCopyRegions.data());
 
-    if (generateMipmaps) {
-      Mipmaps::Generate(image, width, height, 1, 1, mipLevels, copyCommand,
-                        VK_FILTER_LINEAR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        imageLayout);
-    } else {
-      // すべてコピーされた後、テクスチャのイメージレイアウトを変更します。
-      TransitionImageLayout(copyCommand, image, imageSubresourceRange,
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageLayout);
-    }
+    // すべてコピーされた後、テクスチャのイメージレイアウトを変更します。
+    TransitionImageLayout(copyCommand, image, imageSubresourceRange,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageLayout);
     device.FlushCommandBuffer(copyCommand, copyQueue);
 
     // ステージングリソースを破棄します。
@@ -268,7 +254,7 @@ void Texture::Load(const Device &device, const std::string &filepath,
     void *data;
     VK_CHECK_RESULT(
         vkMapMemory(device, memory, 0, memoryRequirements.size, 0, &data));
-    std::memcpy(data, pixels, size);
+    std::memcpy(data, tex2d[0].data(), tex2d[0].size());
     vkUnmapMemory(device, memory);
 
     // 画像のメモリバリアを設定します。
@@ -276,7 +262,6 @@ void Texture::Load(const Device &device, const std::string &filepath,
                           VK_IMAGE_LAYOUT_UNDEFINED, imageLayout);
     device.FlushCommandBuffer(copyCommand, copyQueue);
   }
-  Pixels::Free(pixels);
 
   // デフォルトのサンプラーを生成します。
   VkSamplerCreateInfo samplerCreateInfo = Initializer::SamplerCreateInfo();

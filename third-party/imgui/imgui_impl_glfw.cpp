@@ -40,6 +40,11 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wextra-semi-stmt"
+#endif
+
 // GLFW
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
@@ -354,7 +359,7 @@ void ImGui_ImplGlfw_NewFrame()
     glfwGetFramebufferSize(g_Window, &display_w, &display_h);
     io.DisplaySize = ImVec2((float)w, (float)h);
     if (w > 0 && h > 0)
-        io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
+        io.DisplayFramebufferScale = ImVec2((float)display_w / (float)w, (float)display_h / (float)h);
 
     // Setup time step
     double current_time = glfwGetTime();
@@ -367,3 +372,7 @@ void ImGui_ImplGlfw_NewFrame()
     // Update game controllers (if enabled and available)
     ImGui_ImplGlfw_UpdateGamepads();
 }
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
