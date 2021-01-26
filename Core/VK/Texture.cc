@@ -87,7 +87,7 @@ static void Generate(VkImage image, int32_t width, int32_t height,
 
   imageSubresourceRange.levelCount = mipLevels;
   TransitionImageLayout(commandBuffer, image, imageSubresourceRange,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, finalLayout);
 }
 } // namespace Mipmaps
 
