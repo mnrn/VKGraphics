@@ -48,6 +48,7 @@ public:
 
   float scale = 1.0f;
 private:
+  void InitImGui(GLFWwindow* window) const;
   void SetupResources(const Device &device, VkQueue queue);
   void SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
                      VkRenderPass renderPass);

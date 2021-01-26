@@ -15,18 +15,14 @@
 #include "VK/Utils.h"
 
 #define UI_OVERLAY_VERTEX_SHADER_PATH                                          \
-  "./Assets/Shaders/GLSL/SPIR-V/UI/UIOverlay.vs.spv"
+  "./Assets/Shaders/HLSL/SPIR-V/UI/UIOverlay.vs.spv"
 #define UI_OVERLAY_FRAGMENT_SHADER_PATH                                        \
-  "./Assets/Shaders/GLSL/SPIR-V/UI/UIOverlay.fs.spv"
+  "./Assets/Shaders/HLSL/SPIR-V/UI/UIOverlay.fs.spv"
 
 void Gui::OnInit(GLFWwindow* window, const Device &device, VkQueue queue,
                  VkPipelineCache pipelineCache, VkRenderPass renderPass) {
-  ImGui::CreateContext();
-  ImGui::StyleColorsClassic();
-  ImGui_ImplGlfw_InitForVulkan(window, true);
-  ImGuiIO& io = ImGui::GetIO();
-  io.FontGlobalScale = scale;
 
+  InitImGui(window);
   SetupResources(device, queue);
   SetupPipeline(device, pipelineCache, renderPass);
 }
@@ -157,6 +153,20 @@ void Gui::Draw(VkCommandBuffer commandBuffer) {
     }
     vertexOffset += cmdList->VtxBuffer.Size;
   }
+}
+
+//*-----------------------------------------------------------------------------
+// ImGui
+//*-----------------------------------------------------------------------------
+
+void Gui::InitImGui(GLFWwindow* window) const {
+  ImGui::CreateContext();
+  ImGui_ImplGlfw_InitForVulkan(window, true);
+
+  ImGui::StyleColorsClassic();
+
+  ImGuiIO& io = ImGui::GetIO();
+  io.FontGlobalScale = scale;
 }
 
 //*-----------------------------------------------------------------------------
