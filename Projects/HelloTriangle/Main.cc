@@ -5,8 +5,8 @@
 #include <memory>
 
 #include "App.h"
-#include "JSON.h"
 #include "HelloTriangle.h"
+#include "Json.h"
 
 int main() {
   const auto config = JSON::Parse("./Projects/HelloTriangle/Config.json");

@@ -5,8 +5,8 @@
 #include <memory>
 
 #include "App.h"
+#include "Json.h"
 #include "TextureMapping.h"
-#include "JSON.h"
 
 int main() {
   const auto config = JSON::Parse("./Projects/TextureMapping/Config.json");
