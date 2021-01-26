@@ -118,9 +118,9 @@ void Texture::Load(const Device &device, const std::string &filepath,
     std::cerr << "Failed to load " << filepath << std::endl;
     BOOST_ASSERT_MSG(pixels != nullptr, "Failed to load texture!");
   }
-  const auto width = static_cast<uint32_t>(w);
-  const auto height = static_cast<uint32_t>(h);
-  const auto mipLevels =
+  width = static_cast<uint32_t>(w);
+  height = static_cast<uint32_t>(h);
+  mipLevels =
       generateMipmaps ? static_cast<uint32_t>(
                             std::floor(std::log2(std::max(width, height)))) +
                             1

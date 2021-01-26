@@ -24,4 +24,8 @@ struct Texture {
   VkSampler sampler = VK_NULL_HANDLE;
 
   VkDescriptorImageInfo descriptor{};
+
+  uint32_t width = 0;
+  uint32_t height = 0;
+  uint32_t mipLevels = 1;
 };
