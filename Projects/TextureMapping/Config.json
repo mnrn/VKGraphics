@@ -3,7 +3,7 @@
   "Width" : 1280,
   "Height" : 720,
   "Samples" : 0,
-  "UIOverlay": false,
+  "UIOverlay": true,
   "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Texture/Texture.vs.spv",
   "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Texture/Texture.fs.spv"
 }

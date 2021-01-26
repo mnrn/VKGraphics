@@ -122,12 +122,6 @@ void VkBase::UpdateUIOverlay() {
   ImGui::Render();
 
   uiOverlay.Update(device);
-  /*
-  if (uiOverlay.Update(device) || uiOverlay.updated) {
-    BuildCommandBuffers();
-    uiOverlay.updated = false;
-  }
-   */
 }
 
 void VkBase::OnUpdateUIOverlay() {}
@@ -193,7 +187,7 @@ void VkBase::DrawUI(VkCommandBuffer commandBuffer) {
 // Frame Loop
 //*-----------------------------------------------------------------------------
 
-void VkBase::OnFrameEnd() { UpdateUIOverlay(); }
+void VkBase::OnFrameEnd() { }
 
 void VkBase::WaitIdle() const { VK_CHECK_RESULT(vkDeviceWaitIdle(device)); }
 
