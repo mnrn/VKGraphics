@@ -166,6 +166,7 @@ void Gui::InitImGui(GLFWwindow* window) const {
   ImGui::StyleColorsClassic();
 
   ImGuiIO& io = ImGui::GetIO();
+  io.IniFilename = nullptr;
   io.FontGlobalScale = scale;
 }
 
