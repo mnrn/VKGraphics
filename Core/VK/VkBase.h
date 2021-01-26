@@ -29,6 +29,7 @@ public:
   virtual void OnUpdate(float);
   virtual void OnRender();
 
+  void OnFrameEnd();
   void WaitIdle() const;
 
   static void OnResized(GLFWwindow *window, int width, int height);
@@ -39,8 +40,8 @@ protected:
   virtual void OnPostInit();
   virtual void OnPreDestroy();
 
-  virtual void OnUpdateUIOverlay(float);
-  virtual void OnUpdateUIOverlay(const Gui &uiOverlay);
+  virtual void OnUpdateUIOverlay();
+  void UpdateUIOverlay();
   void DrawUI(VkCommandBuffer commandBuffer);
 
   void CreateSwapchain(int width, int height);

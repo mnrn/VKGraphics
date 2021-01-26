@@ -20,8 +20,8 @@ public:
               VkPipelineCache pipelineCache, VkRenderPass renderPass);
               */
   void OnDestroy(const Device &device) const;
-  bool OnUpdate(const Device &device);
-  void OnRender(VkCommandBuffer commandBuffer);
+  bool Update(const Device &device);
+  void Draw(VkCommandBuffer commandBuffer);
   static void OnResize(uint32_t width, uint32_t height);
 
   uint32_t subpass = 0;
@@ -48,9 +48,6 @@ public:
     alignas(8) glm::vec2 scale;
     alignas(8) glm::vec2 translate;
   } pushConst;
-
-  bool visible = true;
-  bool updated = false;
 
 private:
   void SetupResources(const Device &device, VkQueue queue);

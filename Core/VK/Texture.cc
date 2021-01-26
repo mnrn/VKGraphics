@@ -173,6 +173,9 @@ void Texture::Load(const Device &device, const std::string &filepath,
     if ((imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
       imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
+    if (generateMipmaps) {
+        imageCreateInfo.usage |= (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    }
     VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &image));
 
     VkMemoryRequirements memoryRequirements{};

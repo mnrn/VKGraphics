@@ -289,7 +289,6 @@ VkResult Device::CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
   // バッファハンドルを生成します。
   VkBufferCreateInfo bufferCreateInfo =
       Initializer::BufferCreateInfo(bufferUsageFlags, size);
-  bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   VK_CHECK_RESULT(
       vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, buffer));
 

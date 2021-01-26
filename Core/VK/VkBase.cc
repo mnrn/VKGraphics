@@ -104,7 +104,7 @@ void VkBase::OnDestroy() {
 
 void VkBase::OnUpdate(float) {}
 
-void VkBase::OnUpdateUIOverlay(float) {
+void VkBase::UpdateUIOverlay() {
   if (safeUIOverlay == std::nullopt) {
     return;
   }
@@ -117,17 +117,20 @@ void VkBase::OnUpdateUIOverlay(float) {
   ImGui::NewFrame();
   ImGui::SetNextWindowPos(ImVec2(10, 10));
   ImGui::Begin(config["AppName"].get<std::string>().c_str());
-
+  OnUpdateUIOverlay();
   ImGui::End();
   ImGui::Render();
 
-  if (uiOverlay.OnUpdate(device) || uiOverlay.updated) {
+  uiOverlay.Update(device);
+  /*
+  if (uiOverlay.Update(device) || uiOverlay.updated) {
     BuildCommandBuffers();
     uiOverlay.updated = false;
   }
+   */
 }
 
-void VkBase::OnUpdateUIOverlay(const Gui &uiOverlay) {}
+void VkBase::OnUpdateUIOverlay() {}
 
 //*-----------------------------------------------------------------------------
 // Render
@@ -173,6 +176,8 @@ void VkBase::DrawUI(VkCommandBuffer commandBuffer) {
   if (safeUIOverlay == std::nullopt) {
     return;
   }
+  auto uiOverlay = safeUIOverlay.value();
+
   const auto viewport = Initializer::Viewport(
       static_cast<float>(swapchain.extent.width),
       static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
@@ -181,10 +186,16 @@ void VkBase::DrawUI(VkCommandBuffer commandBuffer) {
   vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
   vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-  safeUIOverlay.value().OnRender(commandBuffer);
+  uiOverlay.Draw(commandBuffer);
 }
 
-void VkBase::WaitIdle() const { vkDeviceWaitIdle(device); }
+//*-----------------------------------------------------------------------------
+// Frame Loop
+//*-----------------------------------------------------------------------------
+
+void VkBase::OnFrameEnd() { UpdateUIOverlay(); }
+
+void VkBase::WaitIdle() const { VK_CHECK_RESULT(vkDeviceWaitIdle(device)); }
 
 //*-----------------------------------------------------------------------------
 // Resize window

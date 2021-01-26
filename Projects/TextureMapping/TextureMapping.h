@@ -12,6 +12,7 @@ class TextureMapping : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;
+  void OnUpdateUIOverlay() override;
 
   void LoadAssets();
   void PrepareCamera();
@@ -25,6 +26,7 @@ public:
   void SetupDescriptorSet();
 
   void BuildCommandBuffers() override;
+
   void ViewChanged() override;
 
 private:

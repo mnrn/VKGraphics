@@ -50,7 +50,7 @@ void Gui::OnResize(uint32_t width, uint32_t height) {
 /**
  * @brief 必要に応じてImGuiの頂点とインデックスバッファを更新します。
  */
-bool Gui::OnUpdate(const Device &device) {
+bool Gui::Update(const Device &device) {
   ImDrawData *imDrawData = ImGui::GetDrawData();
   if (imDrawData == nullptr) {
     return false;
@@ -70,11 +70,12 @@ bool Gui::OnUpdate(const Device &device) {
       (vertexCount != static_cast<uint32_t>(imDrawData->TotalVtxCount))) {
     vertexBuffer.Unmap(device);
     vertexBuffer.Destroy(device);
+
     VK_CHECK_RESULT(vertexBuffer.Create(
         device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, vertexBufferSize));
+
     vertexCount = imDrawData->TotalVtxCount;
-    vertexBuffer.Unmap(device);
     VK_CHECK_RESULT(vertexBuffer.Map(device));
     updateCmdBuffers = true;
   }
@@ -101,6 +102,8 @@ bool Gui::OnUpdate(const Device &device) {
                 cmdList->VtxBuffer.Size * sizeof(ImDrawVert));
     std::memcpy(idxDst, cmdList->IdxBuffer.Data,
                 cmdList->IdxBuffer.Size * sizeof(ImDrawIdx));
+    vtxDst += cmdList->VtxBuffer.Size;
+    idxDst += cmdList->IdxBuffer.Size;
   }
 
   // 書き込みをGPUに表示するためにフラッシュします。
@@ -110,7 +113,7 @@ bool Gui::OnUpdate(const Device &device) {
   return updateCmdBuffers;
 }
 
-void Gui::OnRender(VkCommandBuffer commandBuffer) {
+void Gui::Draw(VkCommandBuffer commandBuffer) {
   ImDrawData *imDrawData = ImGui::GetDrawData();
   if ((imDrawData == nullptr) || (imDrawData->CmdListsCount == 0)) {
     return;

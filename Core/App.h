@@ -58,6 +58,8 @@ public:
 
       app->OnUpdate(static_cast<float>(glfwGetTime()));
       app->OnRender();
+
+      app->OnFrameEnd();
     }
     app->WaitIdle();
 

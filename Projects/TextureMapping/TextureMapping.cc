@@ -112,6 +112,8 @@ void TextureMapping::BuildCommandBuffers() {
     // インデックス付きの三角形を描画します。
     vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 1);
 
+    DrawUI(drawCmdBuffers[i]);
+
     vkCmdEndRenderPass(drawCmdBuffers[i]);
 
     // レンダーパスを終了すると、フレームバッファのカラーアタッチメントに移行する暗黙のバリアが追加されます。
@@ -378,4 +380,8 @@ void TextureMapping::UpdateUniformBuffers() {
 
   // ユニフォームバッファへコピーします。
   uniformBuffer.CopyTo(&ubo, sizeof(ubo));
+}
+
+void TextureMapping::OnUpdateUIOverlay() {
+
 }
