@@ -12,6 +12,7 @@
 
 #include <boost/assert.hpp>
 #include <imgui.h>
+#include <imgui_impl_glfw.h>
 #include <map>
 #include <spdlog/spdlog.h>
 
@@ -31,7 +32,7 @@ void VkBase::OnInit(const nlohmann::json &conf, GLFWwindow *hwnd) {
 
   CreateInstance(appName.c_str());
 #if !defined(NDEBUG)
-  safeDebugMessenger = std::make_optional<DebugMessenger>(instance);
+  debugMessenger.Setup(instance);
 #endif
   VkPhysicalDevice physicalDevice = SelectPhysicalDevice();
   swapchain.Init(instance, window, physicalDevice);
@@ -60,9 +61,8 @@ void VkBase::OnPostInit() {
   CreatePipelineCache();
   SetupFramebuffers();
 
-  if (config.contains("UIOverlay") && config["UIOverlay"]) {
-    safeUIOverlay =
-        std::make_optional<Gui>(device, queue, pipelineCache, renderPass);
+  if (IsEnabledUIOverlay()) {
+    uiOverlay.OnInit(window, device, queue, pipelineCache, renderPass);
   }
 }
 
@@ -71,8 +71,8 @@ void VkBase::OnPreDestroy() {}
 void VkBase::OnDestroy() {
   OnPreDestroy();
 
-  if (safeUIOverlay) {
-    safeUIOverlay.value().OnDestroy(device);
+  if (IsEnabledUIOverlay()) {
+    uiOverlay.OnDestroy(device);
   }
 
   swapchain.Destroy(instance, device);
@@ -92,9 +92,9 @@ void VkBase::OnDestroy() {
   DestroySyncObjects();
 
   device.Destroy();
-  if (safeDebugMessenger) {
-    safeDebugMessenger.value().Cleanup(instance);
-  }
+#if !defined(NDEBUG)
+  debugMessenger.Cleanup(instance);
+#endif
   vkDestroyInstance(instance, nullptr);
 }
 
@@ -105,23 +105,32 @@ void VkBase::OnDestroy() {
 void VkBase::OnUpdate(float) {}
 
 void VkBase::UpdateUIOverlay() {
-  if (safeUIOverlay == std::nullopt) {
+  if (!IsEnabledUIOverlay()) {
     return;
   }
 
-  auto uiOverlay = safeUIOverlay.value();
   ImGuiIO &io = ImGui::GetIO();
   io.DisplaySize = ImVec2(static_cast<float>(swapchain.extent.width),
                           static_cast<float>(swapchain.extent.height));
 
+  ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
   ImGui::SetNextWindowPos(ImVec2(10, 10));
+  ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+
   ImGui::Begin(config["AppName"].get<std::string>().c_str());
+  ImGui::PushItemWidth(100.0f * uiOverlay.scale);
   OnUpdateUIOverlay();
+  ImGui::PopItemWidth();
   ImGui::End();
+
+  ImGui::PopStyleVar();
   ImGui::Render();
 
-  uiOverlay.Update(device);
+  if (uiOverlay.Update(device)) {
+    BuildCommandBuffers();
+  }
 }
 
 void VkBase::OnUpdateUIOverlay() {}
@@ -167,10 +176,9 @@ void VkBase::SubmitFrame() {
 }
 
 void VkBase::DrawUI(VkCommandBuffer commandBuffer) {
-  if (safeUIOverlay == std::nullopt) {
+  if (!IsEnabledUIOverlay()) {
     return;
   }
-  auto uiOverlay = safeUIOverlay.value();
 
   const auto viewport = Initializer::Viewport(
       static_cast<float>(swapchain.extent.width),
@@ -187,7 +195,7 @@ void VkBase::DrawUI(VkCommandBuffer commandBuffer) {
 // Frame Loop
 //*-----------------------------------------------------------------------------
 
-void VkBase::OnFrameEnd() { }
+void VkBase::OnFrameEnd() { UpdateUIOverlay(); }
 
 void VkBase::WaitIdle() const { VK_CHECK_RESULT(vkDeviceWaitIdle(device)); }
 
@@ -224,8 +232,8 @@ void VkBase::ResizeWindow() {
   }
   SetupFramebuffers();
 
-  if (safeUIOverlay) {
-    safeUIOverlay.value().OnResize(width, height);
+  if (IsEnabledUIOverlay()) {
+    Gui::OnResize(width, height);
   }
 
   // Frame buffersの再生成後にCommand buffersも再生成する必要があります。
@@ -569,4 +577,8 @@ VkPhysicalDeviceFeatures VkBase::GetEnabledFeatures() const {
 
 std::vector<const char *> VkBase::GetEnabledDeviceExtensions() const {
   return {};
+}
+
+bool VkBase::IsEnabledUIOverlay() const {
+  return config.contains("UIOverlay") && config["UIOverlay"];
 }

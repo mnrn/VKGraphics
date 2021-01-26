@@ -71,6 +71,7 @@ protected:
   [[nodiscard]] virtual std::vector<const char *>
   GetEnabledDeviceExtensions() const;
   [[nodiscard]] virtual VkPhysicalDevice SelectPhysicalDevice() const;
+  [[nodiscard]] virtual bool IsEnabledUIOverlay() const;
 
   VkInstance instance = VK_NULL_HANDLE;
   Device device{};
@@ -114,9 +115,10 @@ protected:
     VkImageView view = VK_NULL_HANDLE;
   } depthStencil;
 
-  std::optional<Gui> safeUIOverlay = std::nullopt;
-  std::optional<DebugMessenger> safeDebugMessenger = std::nullopt;
-
+  Gui uiOverlay{};
+#if !defined(NDEBUG)
+  DebugMessenger debugMessenger{};
+#endif
   GLFWwindow *window = nullptr;
   nlohmann::json config{};
   bool isFramebufferResized = false;

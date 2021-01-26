@@ -10,15 +10,12 @@
 #include "VK/Buffer.h"
 
 struct Device;
+struct GLFWwindow;
 
 struct Gui {
 public:
-  Gui(const Device &device, VkQueue queue, VkPipelineCache pipelineCache,
-      VkRenderPass renderPass);
-  /*
-  void OnInit(const Device &device, VkQueue queue,
+  void OnInit(GLFWwindow* window, const Device &device, VkQueue queue,
               VkPipelineCache pipelineCache, VkRenderPass renderPass);
-              */
   void OnDestroy(const Device &device) const;
   bool Update(const Device &device);
   void Draw(VkCommandBuffer commandBuffer);
@@ -49,6 +46,7 @@ public:
     alignas(8) glm::vec2 translate;
   } pushConst;
 
+  float scale = 1.0f;
 private:
   void SetupResources(const Device &device, VkQueue queue);
   void SetupPipeline(const Device &device, VkPipelineCache pipelineCache,

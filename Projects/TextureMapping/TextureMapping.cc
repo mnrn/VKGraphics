@@ -6,6 +6,7 @@
 #include <array>
 #include <boost/assert.hpp>
 #include <vector>
+#include <imgui.h>
 
 #include "VK/Common.h"
 #include "VK/Initializer.h"
@@ -34,6 +35,7 @@ void TextureMapping::OnPostInit() {
   SetupDescriptorPool();
   SetupDescriptorSet();
 
+  UpdateUIOverlay();
   BuildCommandBuffers();
 }
 
@@ -383,5 +385,7 @@ void TextureMapping::UpdateUniformBuffers() {
 }
 
 void TextureMapping::OnUpdateUIOverlay() {
+  if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 
+  }
 }

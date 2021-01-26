@@ -5,6 +5,7 @@
 #include "VK/Gui.h"
 
 #include <imgui.h>
+#include <imgui_impl_glfw.h>
 
 #include <vulkan/vulkan.h>
 
@@ -18,10 +19,13 @@
 #define UI_OVERLAY_FRAGMENT_SHADER_PATH                                        \
   "./Assets/Shaders/GLSL/SPIR-V/UI/UIOverlay.fs.spv"
 
-Gui::Gui(const Device &device, VkQueue queue, VkPipelineCache pipelineCache,
-         VkRenderPass renderPass) {
+void Gui::OnInit(GLFWwindow* window, const Device &device, VkQueue queue,
+                 VkPipelineCache pipelineCache, VkRenderPass renderPass) {
   ImGui::CreateContext();
   ImGui::StyleColorsClassic();
+  ImGui_ImplGlfw_InitForVulkan(window, true);
+  ImGuiIO& io = ImGui::GetIO();
+  io.FontGlobalScale = scale;
 
   SetupResources(device, queue);
   SetupPipeline(device, pipelineCache, renderPass);
@@ -38,6 +42,7 @@ void Gui::OnDestroy(const Device &device) const {
   vkDestroyImage(device, font.image, nullptr);
   indexBuffer.Destroy(device);
   vertexBuffer.Destroy(device);
+  ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 }
 
@@ -107,8 +112,8 @@ bool Gui::Update(const Device &device) {
   }
 
   // 書き込みをGPUに表示するためにフラッシュします。
-  VK_CHECK_RESULT(vertexBuffer.Flush(device));
-  VK_CHECK_RESULT(indexBuffer.Flush(device));
+  //VK_CHECK_RESULT(vertexBuffer.Flush(device));
+  //VK_CHECK_RESULT(indexBuffer.Flush(device));
 
   return updateCmdBuffers;
 }

@@ -8,7 +8,6 @@
 
 struct DebugMessenger {
 public:
-  explicit DebugMessenger(VkInstance instance);
   static VkDebugUtilsMessengerCreateInfoEXT ExtractCreateInfo();
   void Setup(VkInstance);
   void Cleanup(VkInstance) const;
