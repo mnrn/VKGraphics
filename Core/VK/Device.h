@@ -30,10 +30,10 @@ public:
                                       const void *data, VkDeviceSize size,
                                       VkBuffer &buffer,
                                       VkDeviceMemory &memory) const;
-  [[nodiscard]] VkResult CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
-                                      VkMemoryPropertyFlags memoryPropertyFlags,
-                                      VkDeviceSize size, VkBuffer &buffer,
-                                      VkDeviceMemory &memory) const;
+  [[nodiscard]] [[maybe_unused]] VkResult
+  CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
+               VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize size,
+               VkBuffer &buffer, VkDeviceMemory &memory) const;
 
   [[nodiscard]] VkCommandBuffer CreateCommandBuffer(
       VkCommandPool pool,
