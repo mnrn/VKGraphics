@@ -21,21 +21,15 @@ message(STATUS "@@Vulkan_LIBRARY: ${Vulkan_LIBRARY}")
 include_directories(${Vulkan_INCLUDE_DIR})
 
 # glfw
-find_library(GLFW_LIBRARIES
-    NAMES
-    glfw
-    glfw3
-    glfw3.3
-    HINTS
-    ${CMAKE_SOURCE_DIR}/Lib/glfw
-    )
+set(GLFW_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/glfw/libglfw.3.3.dylib)
 message("@@ GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
 
 # imgui
 include_directories(SYSTEM third-party/imgui)
 
-# ktx
-include_directories(SYSTEM third-party/ktx/include)
+# assimp
+set(ASSIMP_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/assimp/libassimp.5.0.1.dylib)
+message("@@ ASSIMP_LIBRARIES: ${ASSIMP_LIBRARIES}")
 
 # Warnings
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
@@ -76,6 +70,7 @@ function(build TARGET_NAME)
         ${Vulkan_LIBRARY}
         ${CMAKE_THREAD_LIBS_INIT}
         ${GLFW_LIBRARIES}
+        ${ASSIMP_LIBRARIES}
         )
 endfunction(build)
 
