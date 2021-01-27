@@ -107,12 +107,30 @@ VkResult Buffer::Invalidate(const Device &device, const VkDeviceSize size,
 VkResult Buffer::Create(const Device &device,
                         VkBufferUsageFlags bufferUsageFlags,
                         VkMemoryPropertyFlags memoryPropertyFlags,
-                        VkDeviceSize size, void *data) {
+                        void *data, VkDeviceSize size) {
   VkResult result = device.CreateBuffer(bufferUsageFlags, memoryPropertyFlags,
                                         size, &buffer, &memory, data);
   SetupDescriptor(size);
   return result;
 }
+
+/**
+ * @brief デバイス上にバッファを生成します。
+ * @param device Vulkanデバイス
+ * @param bufferUsageFlags 使用フラグビットマスク(Vertex, Index, Uniformなど)
+ * @param memoryPropertyFlags
+ * メモリプロパティ(DeviceLocal,HostVisible,Coherentなど)
+ * @param size バイト単位のバッファサイズ
+ * @return バッファハンドルとメモリが生成された場合、VK_SUCCESSを返します。
+ */
+VkResult Buffer::Create(const Device &device,
+                        VkBufferUsageFlags bufferUsageFlags,
+                        VkMemoryPropertyFlags memoryPropertyFlags,
+                        VkDeviceSize size) {
+  return device.CreateBuffer(bufferUsageFlags, memoryPropertyFlags,
+                             size, &buffer, &memory, nullptr);
+}
+
 
 /**
  * @brief バッファが持っているリソースを解放します。

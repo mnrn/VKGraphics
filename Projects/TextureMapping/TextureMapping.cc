@@ -343,13 +343,13 @@ void TextureMapping::PrepareVertices() {
   VK_CHECK_RESULT(vertexBuffer.Create(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                      sizeof(Vertex) * vertices.size(),
-                                      vertices.data()));
+                                      vertices.data(),
+                                      sizeof(Vertex) * vertices.size()));
   VK_CHECK_RESULT(indexBuffer.Create(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     sizeof(uint32_t) * indices.size(),
-                                     indices.data()));
+                                     indices.data(),
+                                     sizeof(uint32_t) * indices.size()));
 }
 
 /**
@@ -363,7 +363,7 @@ void TextureMapping::PrepareUniformBuffers() {
                                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       sizeof(ubo), &ubo));
+                                       &ubo, sizeof(ubo)));
   VK_CHECK_RESULT(uniformBuffer.Map(device));
   UpdateUniformBuffers();
 }
