@@ -21,20 +21,23 @@
 
 namespace Pixels {
 [[maybe_unused]] static stbi_uc *Load(const std::string &path, int &w, int &h,
-                     bool flip = true) {
+                                      bool flip = true) {
   int bytesPerPix;
   stbi_set_flip_vertically_on_load(flip);
   return stbi_load(path.c_str(), &w, &h, &bytesPerPix, 4);
 }
 
-[[maybe_unused]] static void Free(unsigned char *data) { stbi_image_free(data); }
+[[maybe_unused]] static void Free(unsigned char *data) {
+  stbi_image_free(data);
+}
 } // namespace Pixels
 
 namespace Mipmaps {
-[[maybe_unused]] static void Generate(VkImage image, int32_t width, int32_t height,
-                     int32_t depth, uint32_t layerCount, uint32_t mipLevels,
-                     VkCommandBuffer commandBuffer, VkFilter blitFilter,
-                     VkImageLayout initialLayout, VkImageLayout finalLayout) {
+[[maybe_unused]] static void
+Generate(VkImage image, int32_t width, int32_t height, int32_t depth,
+         uint32_t layerCount, uint32_t mipLevels, VkCommandBuffer commandBuffer,
+         VkFilter blitFilter, VkImageLayout initialLayout,
+         VkImageLayout finalLayout) {
   VkImageSubresourceRange imageSubresourceRange{};
   imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageSubresourceRange.baseMipLevel = 0;
@@ -137,7 +140,7 @@ void Texture::Load(const Device &device, const std::string &filepath,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        tex2d.size(), &stagingBuffer, &stagingMemory, tex2d.data()));
+        tex2d.data(), tex2d.size(), stagingBuffer, stagingMemory));
 
     // バッファコピー領域を設定します。
     std::vector<VkBufferImageCopy> bufferImageCopyRegions{};

@@ -284,17 +284,17 @@ Device::CreateLogicalDevice(VkPhysicalDeviceFeatures requestedFeatures,
  */
 VkResult Device::CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
                               VkMemoryPropertyFlags memoryPropertyFlags,
-                              VkDeviceSize size, VkBuffer *buffer,
-                              VkDeviceMemory *memory, const void *data) const {
+                              const void *data, VkDeviceSize size,
+                              VkBuffer &buffer, VkDeviceMemory &memory) const {
   // バッファハンドルを生成します。
   VkBufferCreateInfo bufferCreateInfo =
       Initializer::BufferCreateInfo(bufferUsageFlags, size);
   VK_CHECK_RESULT(
-      vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, buffer));
+      vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, &buffer));
 
   // バッファハンドルをバックアップするメモリを生成します。
   VkMemoryRequirements memoryRequirements{};
-  vkGetBufferMemoryRequirements(logicalDevice, *buffer, &memoryRequirements);
+  vkGetBufferMemoryRequirements(logicalDevice, buffer, &memoryRequirements);
   VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
   memoryAllocateInfo.allocationSize = memoryRequirements.size;
 
@@ -310,30 +310,48 @@ VkResult Device::CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
     memoryAllocateInfo.pNext = &allocateFlagsInfo;
   }
   VK_CHECK_RESULT(
-      vkAllocateMemory(logicalDevice, &memoryAllocateInfo, nullptr, memory));
+      vkAllocateMemory(logicalDevice, &memoryAllocateInfo, nullptr, &memory));
 
   // バッファデータへのポインタが渡された場合は、バッファをマップしてデータをコピーします。
   if (data != nullptr) {
     void *mapped;
-    VK_CHECK_RESULT(vkMapMemory(logicalDevice, *memory, 0, size, 0, &mapped));
+    VK_CHECK_RESULT(vkMapMemory(logicalDevice, memory, 0, size, 0, &mapped));
     std::memcpy(mapped, data, size);
 
     // ホストの一貫性(Coherency)がリクエストされていない場合は、手動でフラッシュして書き込みを表示します。
     if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
       VkMappedMemoryRange mappedMemoryRange = Initializer::MappedMemoryRange();
-      mappedMemoryRange.memory = *memory;
+      mappedMemoryRange.memory = memory;
       mappedMemoryRange.offset = 0;
       mappedMemoryRange.size = size;
       VK_CHECK_RESULT(
           vkFlushMappedMemoryRanges(logicalDevice, 1, &mappedMemoryRange));
     }
-    vkUnmapMemory(logicalDevice, *memory);
+    vkUnmapMemory(logicalDevice, memory);
   }
   // メモリをバッファオブジェクトにアタッチします。
-  VK_CHECK_RESULT(vkBindBufferMemory(logicalDevice, *buffer, *memory, 0));
+  VK_CHECK_RESULT(vkBindBufferMemory(logicalDevice, buffer, memory, 0));
   return VK_SUCCESS;
 }
 
+/**
+ * @brief デバイス上にバッファを生成します。
+ * @param device Vulkanデバイス
+ * @param bufferUsageFlags 使用フラグビットマスク(Vertex, Index, Uniformなど)
+ * @param memoryPropertyFlags
+ * メモリプロパティ(DeviceLocal, HostVisible, ÒCoherentなど)
+ * @param size バイト単位のバッファサイズ
+ * @param buffer バッファハンドルへのポインタ
+ * @param memory メモリハンドルへのポインタ
+ * @return バッファハンドルとメモリが生成された場合、VK_SUCCESSを返します。
+ */
+VkResult Device::CreateBuffer(VkBufferUsageFlags bufferUsageFlags,
+                              VkMemoryPropertyFlags memoryPropertyFlags,
+                              VkDeviceSize size, VkBuffer &buffer,
+                              VkDeviceMemory &memory) const {
+  return CreateBuffer(bufferUsageFlags, memoryPropertyFlags, nullptr, size,
+                      buffer, memory);
+}
 /**
  * @brief アロケートコマンドバッファ用のコマンドプールを生成します。
  * @param queueFamilyIndex

@@ -106,10 +106,10 @@ VkResult Buffer::Invalidate(const Device &device, const VkDeviceSize size,
  */
 VkResult Buffer::Create(const Device &device,
                         VkBufferUsageFlags bufferUsageFlags,
-                        VkMemoryPropertyFlags memoryPropertyFlags,
-                        void *data, VkDeviceSize size) {
+                        VkMemoryPropertyFlags memoryPropertyFlags, void *data,
+                        VkDeviceSize size) {
   VkResult result = device.CreateBuffer(bufferUsageFlags, memoryPropertyFlags,
-                                        size, &buffer, &memory, data);
+                                        data, size, buffer, memory);
   SetupDescriptor(size);
   return result;
 }
@@ -127,10 +127,8 @@ VkResult Buffer::Create(const Device &device,
                         VkBufferUsageFlags bufferUsageFlags,
                         VkMemoryPropertyFlags memoryPropertyFlags,
                         VkDeviceSize size) {
-  return device.CreateBuffer(bufferUsageFlags, memoryPropertyFlags,
-                             size, &buffer, &memory, nullptr);
+  return Create(device, bufferUsageFlags, memoryPropertyFlags, nullptr, size);
 }
-
 
 /**
  * @brief バッファが持っているリソースを解放します。
