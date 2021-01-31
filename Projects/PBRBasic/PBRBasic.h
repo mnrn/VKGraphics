@@ -2,8 +2,8 @@
 
 #include "VK/VkBase.h"
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "VK/Buffer.h"
 #include "VK/Model.h"
@@ -38,7 +38,6 @@ private:
     alignas(16) glm::mat4 proj;
   } ubo;
 
-
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
 
@@ -47,8 +46,7 @@ private:
 
   Camera camera{};
 
-  Buffer vertexBuffer{};
-  Buffer indexBuffer{};
-  uint32_t indexCount = 0;
+  VertexLayout vertexLayout{{VertexLayoutComponent::Position}};
+  Model model;
   Buffer uniformBuffer{};
 };

@@ -16,8 +16,9 @@
 #include "VK/Device.h"
 
 static constexpr uint32_t defaultFlags =
-    aiProcess_Triangulate | aiProcess_PreTransformVertices |
-    aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals;
+    aiProcess_FlipWindingOrder | aiProcess_Triangulate |
+    aiProcess_PreTransformVertices | aiProcess_CalcTangentSpace |
+    aiProcess_GenSmoothNormals;
 
 bool Model::LoadFromFile(const Device &device, const std::string &filepath,
                          VkQueue copyQueue, const VertexLayout &vertexLayout,
@@ -70,12 +71,12 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
         switch (component) {
         case VertexLayoutComponent::Position:
           vertexBuffer.emplace_back(pos.x * scale.x + center.x);
-          vertexBuffer.emplace_back(-pos.y * scale.y + center.y);
+          vertexBuffer.emplace_back(pos.y * scale.y + center.y);
           vertexBuffer.emplace_back(pos.z * scale.z + center.z);
           break;
         case VertexLayoutComponent::Normal:
           vertexBuffer.emplace_back(norm.x);
-          vertexBuffer.emplace_back(-norm.y);
+          vertexBuffer.emplace_back(norm.y);
           vertexBuffer.emplace_back(norm.z);
           break;
         case VertexLayoutComponent::UV:
@@ -128,8 +129,10 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
       indexBuffer.emplace_back(indexBase + face.mIndices[1]);
       indexBuffer.emplace_back(indexBase + face.mIndices[2]);
       meshes[i].indexCount += 3;
+      indexCount += 3;
     }
   }
+
   const auto vtxBufSize =
       static_cast<uint32_t>(vertexBuffer.size()) * sizeof(float);
   const auto idxBufSize =
@@ -150,14 +153,14 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
   // デバイスのローカルターゲットバッファを生成します。
   VK_CHECK_RESULT(vertices.Create(
       device,
-      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-          modelCreateInfo.memoryPropertyFlags,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vtxBufSize));
+      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | modelCreateInfo.memoryPropertyFlags,
+      vtxBufSize));
   VK_CHECK_RESULT(indices.Create(
       device,
-      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-          modelCreateInfo.memoryPropertyFlags,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, idxBufSize));
+      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | modelCreateInfo.memoryPropertyFlags,
+      idxBufSize));
 
   // ステージングバッファからコピーします。
   VkCommandBuffer copyCmd = device.CreateCommandBuffer();

@@ -10,12 +10,7 @@
 
 #include "VK/Common.h"
 #include "VK/Initializer.h"
-#include "VK/Model.h"
 #include "VK/Utils.h"
-
-struct Vertex {
-  glm::vec3 pos;
-};
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
@@ -38,6 +33,8 @@ void PBRBasic::OnPostInit() {
 }
 
 void PBRBasic::OnPreDestroy() {
+  model.Destroy(device);
+
   uniformBuffer.Destroy(device);
 
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
@@ -100,13 +97,13 @@ void PBRBasic::BuildCommandBuffers() {
 
     // 三角形の頂点バッファとインデックスバッファをバインドします。
     VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer,
+    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &model.vertices.buffer,
                            offsets);
-    vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0,
+    vkCmdBindIndexBuffer(drawCmdBuffers[i], model.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
 
     // インデックス付きの三角形を描画します。
-    vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 0);
+    vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
 
     DrawUI(drawCmdBuffers[i]);
 
@@ -124,29 +121,10 @@ void PBRBasic::ViewChanged() { UpdateUniformBuffers(); }
 //*-----------------------------------------------------------------------------
 
 void PBRBasic::LoadAssets() {
-  // 頂点を設定します。
-  std::vector<Vertex> vertices = {
-      {{-1.0f, -1.0f, 0.0f}},
-      {{1.0f, -1.0f, 0.0f}},
-      {{1.0f, 1.0f, 0.0f}},
-      {{-1.0f, 1.0f, 0.0f}},
-  };
-
-  // インデックスを設定します。
-  std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
-  indexCount = static_cast<uint32_t>(indices.size());
-
-  // 今回はステージングを行いません。
-  VK_CHECK_RESULT(vertexBuffer.Create(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                      vertices.data(),
-                                      sizeof(Vertex) * vertices.size()));
-  VK_CHECK_RESULT(indexBuffer.Create(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     indices.data(),
-                                     sizeof(uint32_t) * indices.size()));
+  const auto &modelPath = config["Model"].get<std::string>();
+  const auto result =
+      model.LoadFromFile(device, modelPath, queue, vertexLayout);
+  BOOST_ASSERT_MSG(result, "Failed to load model!");
 }
 
 //*-----------------------------------------------------------------------------
@@ -193,7 +171,7 @@ void PBRBasic::SetupPipelines() {
   // ラスタライズステート
   VkPipelineRasterizationStateCreateInfo rasterizationState =
       Initializer::PipelineRasterizationStateCreateInfo(
-          VK_POLYGON_MODE_FILL, VK_CULL_MODE_FRONT_BIT,
+          VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE,
           VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
   // カラーブレンドステートは、ブレンド係数の計算方法を示します。
@@ -238,7 +216,7 @@ void PBRBasic::SetupPipelines() {
   // 頂点入力バインディング
   // この例では、バインディングポイント0で単一の頂点入力バインディングを使用しています。
   std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
-      Initializer::VertexInputBindingDescription(0, sizeof(Vertex),
+      Initializer::VertexInputBindingDescription(0, vertexLayout.Stride(),
                                                  VK_VERTEX_INPUT_RATE_VERTEX),
   };
 
@@ -246,7 +224,7 @@ void PBRBasic::SetupPipelines() {
   // これらはシェーダーレイアウトに一致します。
   std::vector<VkVertexInputAttributeDescription> vertexInputAttributes = {
       Initializer::VertexInputAttributeDescription(
-          0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos)),
+          0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
   };
 
   // パイプラインの作成に使用される頂点入力ステート
