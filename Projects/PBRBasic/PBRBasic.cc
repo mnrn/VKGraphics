@@ -35,7 +35,8 @@ void PBRBasic::OnPostInit() {
 void PBRBasic::OnPreDestroy() {
   model.Destroy(device);
 
-  uniformBuffer.Destroy(device);
+  uniformBuffers.params.Destroy(device);
+  uniformBuffers.object.Destroy(device);
 
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -56,7 +57,7 @@ void PBRBasic::BuildCommandBuffers() {
   // LoadOpをclearに設定して　すべてのフレームバッファにclear値を設定します。
   // サブパスの開始時にクリアされる2つのアタッチメント(カラーとデプス)を使用するため、両方にクリア値を設定する必要があります。
   std::array<VkClearValue, 2> clear{};
-  clear[0].color = {{0.0f, 1.0f, 1.0f, 1.0f}};
+  clear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
   clear[1].depthStencil = {1.0f, 0};
 
   VkRenderPassBeginInfo renderPassBeginInfo =
@@ -102,8 +103,17 @@ void PBRBasic::BuildCommandBuffers() {
     vkCmdBindIndexBuffer(drawCmdBuffers[i], model.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
 
-    // インデックス付きの三角形を描画します。
-    vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
+    for (const auto x : {-1.0f, 1.0f}) {
+      const glm::vec3 pos = glm::vec3(x, 0.0f, 0.0);
+      vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3),
+                         &pos);
+      vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
+                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::vec3),
+                         sizeof(Material::PushConst),
+                         &materials[materialIdx].params);
+      vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
+    }
 
     DrawUI(drawCmdBuffers[i]);
 
@@ -125,6 +135,18 @@ void PBRBasic::LoadAssets() {
   const auto result =
       model.LoadFromFile(device, modelPath, queue, vertexLayout);
   BOOST_ASSERT_MSG(result, "Failed to load model!");
+
+  materials.emplace_back("Iron", glm::vec3(0.560f, 0.570f, 0.580f));
+  materials.emplace_back("Silver", glm::vec3(0.972f, 0.960f, 0.915f));
+  materials.emplace_back("Aluminium", glm::vec3(0.913f, 0.921f, 0.925f));
+  materials.emplace_back("Gold", glm::vec3(1.000f, 0.766f, 0.336f));
+  materials.emplace_back("Copper", glm::vec3(0.955f, 0.637f, 0.538f));
+  materials.emplace_back("Chromium", glm::vec3(0.550f, 0.556f, 0.556f));
+  materials.emplace_back("Nickel", glm::vec3(0.660f, 0.609f, 0.526f));
+  materials.emplace_back("Titanium", glm::vec3(0.542f, 0.497f, 0.449f));
+  materials.emplace_back("Cobalt", glm::vec3(0.662f, 0.665f, 0.634f));
+  materials.emplace_back("Platinum", glm::vec3(0.672f, 0.637f, 0.585f));
+  materialIdx = 3;
 }
 
 //*-----------------------------------------------------------------------------
@@ -141,6 +163,8 @@ void PBRBasic::SetupDescriptorSetLayout() {
       Initializer::DescriptorSetLayoutBinding(
           VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+      Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                              VK_SHADER_STAGE_FRAGMENT_BIT, 1),
   };
 
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo =
@@ -148,10 +172,21 @@ void PBRBasic::SetupDescriptorSetLayout() {
   VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
       device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
 
+  std::vector<VkPushConstantRange> pushConstantRanges = {
+      Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT,
+                                     sizeof(glm::vec3), 0),
+      Initializer::PushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT,
+                                     sizeof(Material::PushConst),
+                                     sizeof(glm::vec3)),
+  };
+
   // この記述子セットレイアウトに基づくレンダリングパイプラインを生成するために使用されるパイプラインレイアウトを作成します。
   // より複雑なシナリオでは、再利用できる記述子セットのレイアウトごとに異なるパイプラインレイアウトがあります。
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
       Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
+  pipelineLayoutCreateInfo.pushConstantRangeCount =
+      static_cast<uint32_t>(pushConstantRanges.size());
+  pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
   VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
                                          nullptr, &pipelineLayout));
 }
@@ -225,6 +260,8 @@ void PBRBasic::SetupPipelines() {
   std::vector<VkVertexInputAttributeDescription> vertexInputAttributes = {
       Initializer::VertexInputAttributeDescription(
           0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
+      Initializer::VertexInputAttributeDescription(
+          0, 1, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)),
   };
 
   // パイプラインの作成に使用される頂点入力ステート
@@ -291,7 +328,10 @@ void PBRBasic::SetupDescriptorSet() {
   std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
       Initializer::WriteDescriptorSet(descriptorSet,
                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                      &uniformBuffer.descriptor),
+                                      &uniformBuffers.object.descriptor),
+      Initializer::WriteDescriptorSet(descriptorSet,
+                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+                                      &uniformBuffers.params.descriptor),
   };
   vkUpdateDescriptorSets(device,
                          static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -318,12 +358,19 @@ void PBRBasic::PrepareCamera() {
  * OpenGLのような単一のユニフォームはVulkanに存在しなくなりました。すべてのシェーダーユニフォームはユニフォームバッファブロックを介して渡されます。
  */
 void PBRBasic::PrepareUniformBuffers() {
-  VK_CHECK_RESULT(uniformBuffer.Create(device,
-                                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       &ubo, sizeof(ubo)));
-  VK_CHECK_RESULT(uniformBuffer.Map(device));
+  VK_CHECK_RESULT(
+      uniformBuffers.object.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                   &ubo, sizeof(ubo)));
+  VK_CHECK_RESULT(uniformBuffers.object.Map(device));
+
+  VK_CHECK_RESULT(
+      uniformBuffers.params.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                   &uboParams, sizeof(uboParams)));
+  VK_CHECK_RESULT(uniformBuffers.params.Map(device));
 
   UpdateUniformBuffers();
   UpdateLights();
@@ -338,12 +385,18 @@ void PBRBasic::UpdateUniformBuffers() {
   ubo.model = glm::mat4(1.0f);
   ubo.view = camera.GetViewMatrix();
   ubo.proj = camera.GetProjectionMatrix();
+  ubo.eye = camera.GetPosition();
 
   // ユニフォームバッファへコピーします。
-  uniformBuffer.CopyTo(&ubo, sizeof(ubo));
+  uniformBuffers.object.CopyTo(&ubo, sizeof(ubo));
 }
 
-void PBRBasic::UpdateLights() {}
+void PBRBasic::UpdateLights() {
+  uboParams.light[0] = glm::vec4(7.0f, 1.5f, 0.0f, 1.0f);
+  uboParams.light[1] = glm::vec4(0.0f, 1.5f, 3.0f, 1.0f);
+
+  uniformBuffers.params.CopyTo(&uboParams, sizeof(uboParams));
+}
 
 void PBRBasic::OnUpdateUIOverlay() {
   if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
