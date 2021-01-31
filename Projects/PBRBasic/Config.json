@@ -1,0 +1,12 @@
+{
+  "AppName" : "Physically based rendering basics.",
+  "Width" : 1280,
+  "Height" : 720,
+  "Samples" : 0,
+  "UIOverlay": true,
+  "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/PBR/PBR.vs.spv",
+  "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/PBR/PBR.fs.spv",
+  "Models" : [
+    { "Path": "./Assets/Models/OBJ/Cube/cube.obj" }
+  ]
+}

@@ -16,9 +16,8 @@
 #include "VK/Device.h"
 
 static constexpr uint32_t defaultFlags =
-    aiProcess_FlipWindingOrder | aiProcess_Triangulate |
-    aiProcess_PreTransformVertices | aiProcess_CalcTangentSpace |
-    aiProcess_GenSmoothNormals;
+    aiProcess_Triangulate | aiProcess_PreTransformVertices |
+    aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals;
 
 bool Model::LoadFromFile(const Device &device, const std::string &filepath,
                          VkQueue copyQueue, const VertexLayout &vertexLayout,
@@ -138,13 +137,12 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
 
   // ステージングバッファを使用して、頂点バッファとインデックスバッファをデバイスのローカルメモリに移動します。
   Buffer vertexStaging;
-  VK_CHECK_RESULT(vertexStaging.Create(device,
-                                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+  VK_CHECK_RESULT(vertexStaging.Create(device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        vertexBuffer.data(), vtxBufSize));
   Buffer indexStaging;
-  VK_CHECK_RESULT(indexStaging.Create(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+  VK_CHECK_RESULT(indexStaging.Create(device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                       indexBuffer.data(), idxBufSize));
@@ -166,10 +164,11 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
   VkBufferCopy copyRegion{};
 
   copyRegion.size = vtxBufSize;
-  vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, vertices.buffer, 1, &copyRegion);
+  vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, vertices.buffer, 1,
+                  &copyRegion);
 
   copyRegion.size = idxBufSize;
-  vkCmdCopyBuffer(copyCmd, indexStaging.buffer, vertices.buffer, 1, &copyRegion);
+  vkCmdCopyBuffer(copyCmd, indexStaging.buffer, indices.buffer, 1, &copyRegion);
 
   device.FlushCommandBuffer(copyCmd, copyQueue);
 
