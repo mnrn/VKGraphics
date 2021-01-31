@@ -14,12 +14,16 @@ struct GLFWwindow;
 
 struct Gui {
 public:
-  void OnInit(GLFWwindow* window, const Device &device, VkQueue queue,
+  void OnInit(GLFWwindow *window, const Device &device, VkQueue queue,
               VkPipelineCache pipelineCache, VkRenderPass renderPass);
   void OnDestroy(const Device &device) const;
   bool Update(const Device &device);
   void Draw(VkCommandBuffer commandBuffer);
   static void OnResize(uint32_t width, uint32_t height);
+
+  bool Header(const char* label) const;
+  bool SliderFloat(const char* label, float* v, float vmin, float vmax);
+  bool ColorEdit3(const char* label, glm::vec3* color);
 
   uint32_t subpass = 0;
 
@@ -47,8 +51,10 @@ public:
   } pushConst;
 
   float scale = 1.0f;
+  bool updated = false;
+
 private:
-  void InitImGui(GLFWwindow* window) const;
+  void InitImGui(GLFWwindow *window) const;
   void SetupResources(const Device &device, VkQueue queue);
   void SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
                      VkRenderPass renderPass);

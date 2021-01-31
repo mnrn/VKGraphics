@@ -440,3 +440,27 @@ void Gui::SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
   vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
   vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
 }
+
+//*-----------------------------------------------------------------------------
+// GUI Control
+//*-----------------------------------------------------------------------------
+
+bool Gui::Header(const char *label) const {
+  return ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
+}
+
+bool Gui::SliderFloat(const char *label, float *v, float vmin, float vmax) {
+  const bool res = ImGui::SliderFloat(label, v, vmin, vmax);
+  if (res) {
+    updated = true;
+  }
+  return res;
+}
+
+bool Gui::ColorEdit3(const char *label, glm::vec3* color) {
+  const bool res = ImGui::ColorEdit3(label, reinterpret_cast<float *>(color));
+  if (res) {
+    updated = true;
+  }
+  return res;
+}

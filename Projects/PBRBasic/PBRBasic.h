@@ -10,6 +10,20 @@
 #include "VK/Texture.h"
 #include "View/Camera.h"
 
+enum struct MetalColor : std::uint32_t {
+  Nil,
+  Iron,
+  Silver,
+  Aluminum,
+  Gold,
+  Copper,
+  Chromium,
+  Nickel,
+  Titanium,
+  Cobalt,
+  Platinum,
+};
+
 class PBRBasic : public VkBase {
 public:
   void OnPostInit() override;
@@ -78,26 +92,13 @@ private:
   float prevTime = 0.0f;
   float lightAngle = 0.0f;
 
-  enum struct MetalColor : std::uint32_t {
-    Nil,
-    Iron,
-    Silver,
-    Aluminum,
-    Gold,
-    Copper,
-    Chromium,
-    Nickel,
-    Titanium,
-    Cobalt,
-    Platinum,
-  };
   struct Settings {
     glm::vec3 metalSpecular{1.0f, 0.71f, 0.29f};
-    float metalRough = 0.43f;
+    float metalRough = 0.5f;
     MetalColor metalColor = MetalColor::Nil;
 
     glm::vec3 dielectricBaseColor{0.2f, 0.33f, 0.17f};
-    float dielectricRough = 0.43f;
+    float dielectricRough = 0.5f;
     float dielectricReflectance = 0.5f;
   } settings;
 };

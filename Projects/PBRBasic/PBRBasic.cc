@@ -426,6 +426,8 @@ void PBRBasic::UpdateLights() {
 }
 
 void PBRBasic::OnUpdateUIOverlay() {
-  if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-  }
+  uiOverlay.ColorEdit3("Metal Specular", &settings.metalSpecular);
+  uiOverlay.SliderFloat("Metal Roughness", &settings.metalRough, 0.0f, 1.0f);
+  uiOverlay.ColorEdit3("Non-Metal Diffuse Albedo", &settings.dielectricBaseColor);
+  uiOverlay.SliderFloat("Non-Metal Roughness", &settings.dielectricRough, 0.0f, 1.0f);
 }

@@ -119,17 +119,18 @@ void VkBase::UpdateUIOverlay() {
   ImGui::SetNextWindowPos(ImVec2(10, 10));
   ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_FirstUseEver);
 
-  ImGui::Begin(config["AppName"].get<std::string>().c_str());
-  ImGui::PushItemWidth(100.0f * uiOverlay.scale);
+  ImGui::Begin(config["AppName"].get<std::string>().c_str(), nullptr,
+               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove);
   OnUpdateUIOverlay();
-  ImGui::PopItemWidth();
   ImGui::End();
 
   ImGui::PopStyleVar();
   ImGui::Render();
 
-  if (uiOverlay.Update(device)) {
+  if (uiOverlay.Update(device) || uiOverlay.updated) {
     BuildCommandBuffers();
+    uiOverlay.updated = false;
   }
 }
 
