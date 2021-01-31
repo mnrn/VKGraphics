@@ -9,6 +9,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <boost/assert.hpp>
+
 #include "VK/Common.h"
 #include "VK/Device.h"
 #include "VK/Initializer.h"
@@ -18,8 +20,13 @@
   "./Assets/Shaders/HLSL/SPIR-V/UI/UIOverlay.vs.spv"
 #define UI_OVERLAY_FRAGMENT_SHADER_PATH                                        \
   "./Assets/Shaders/HLSL/SPIR-V/UI/UIOverlay.fs.spv"
+#define UI_OVERLAY_FONT_EN_PATH                                                \
+  "./Assets/Fonts/UbuntuMono/UbuntuMono-Regular.ttf"
+#define UI_OVERLAY_FONT_JP_PATH                                                \
+  "./Assets/Fonts/rounded-x-mplus/rounded-x-mplus-2c-medium.ttf"
+//#define UI_OVERLAY_FONT_PATH "./Assets/Fonts/Cica/Cica-Regular.ttf"
 
-void Gui::OnInit(GLFWwindow* window, const Device &device, VkQueue queue,
+void Gui::OnInit(GLFWwindow *window, const Device &device, VkQueue queue,
                  VkPipelineCache pipelineCache, VkRenderPass renderPass) {
 
   InitImGui(window);
@@ -108,8 +115,8 @@ bool Gui::Update(const Device &device) {
   }
 
   // 書き込みをGPUに表示するためにフラッシュします。
-  //VK_CHECK_RESULT(vertexBuffer.Flush(device));
-  //VK_CHECK_RESULT(indexBuffer.Flush(device));
+  // VK_CHECK_RESULT(vertexBuffer.Flush(device));
+  // VK_CHECK_RESULT(indexBuffer.Flush(device));
 
   return updateCmdBuffers;
 }
@@ -159,14 +166,21 @@ void Gui::Draw(VkCommandBuffer commandBuffer) {
 // ImGui
 //*-----------------------------------------------------------------------------
 
-void Gui::InitImGui(GLFWwindow* window) const {
+void Gui::InitImGui(GLFWwindow *window) const {
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
   ImGui::StyleColorsClassic();
 
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   io.IniFilename = nullptr;
+
+  // 英語フォントと日本語フォントを混在させます。
+  ImFontConfig config;
+  config.MergeMode = true;
+  io.Fonts->AddFontFromFileTTF(UI_OVERLAY_FONT_EN_PATH, 16.0f);
+  io.Fonts->AddFontFromFileTTF(UI_OVERLAY_FONT_JP_PATH, 20.0f, &config,
+                               io.Fonts->GetGlyphRangesJapanese());
   io.FontGlobalScale = scale;
 }
 
