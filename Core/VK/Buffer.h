@@ -30,7 +30,7 @@ struct Buffer {
 
   void SetupDescriptor(VkDeviceSize size = VK_WHOLE_SIZE,
                        VkDeviceSize offset = 0);
-  void CopyTo(void *data, VkDeviceSize size) const;
+  void Copy(void *data, VkDeviceSize size) const;
   [[nodiscard]] VkResult Flush(const Device &device,
                                VkDeviceSize size = VK_WHOLE_SIZE,
                                VkDeviceSize offset = 0) const;

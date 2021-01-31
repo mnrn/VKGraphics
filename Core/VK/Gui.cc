@@ -234,7 +234,7 @@ void Gui::SetupResources(const Device &device, VkQueue queue) {
                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        uploadSize));
   VK_CHECK_RESULT(stagingBuffer.Map(device));
-  stagingBuffer.CopyTo(fontData, uploadSize);
+  stagingBuffer.Copy(fontData, uploadSize);
   stagingBuffer.Unmap(device);
 
   // バッファデータをフォントイメージにコピーします。

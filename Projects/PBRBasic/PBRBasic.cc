@@ -388,14 +388,14 @@ void PBRBasic::UpdateUniformBuffers() {
   ubo.eye = camera.GetPosition();
 
   // ユニフォームバッファへコピーします。
-  uniformBuffers.object.CopyTo(&ubo, sizeof(ubo));
+  uniformBuffers.object.Copy(&ubo, sizeof(ubo));
 }
 
 void PBRBasic::UpdateLights() {
   uboParams.light[0] = glm::vec4(7.0f, 1.5f, 0.0f, 1.0f);
   uboParams.light[1] = glm::vec4(0.0f, 1.5f, 3.0f, 1.0f);
 
-  uniformBuffers.params.CopyTo(&uboParams, sizeof(uboParams));
+  uniformBuffers.params.Copy(&uboParams, sizeof(uboParams));
 }
 
 void PBRBasic::OnUpdateUIOverlay() {

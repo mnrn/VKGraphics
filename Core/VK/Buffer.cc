@@ -57,7 +57,7 @@ void Buffer::SetupDescriptor(VkDeviceSize size, VkDeviceSize offset) {
  * @param data コピーするデータへのポインタ
  * @param size コピーするデータのサイズ
  */
-void Buffer::CopyTo(void *data, VkDeviceSize size) const {
+void Buffer::Copy(void *data, VkDeviceSize size) const {
   BOOST_ASSERT(mapped != nullptr);
   std::memcpy(mapped, data, size);
 }

@@ -380,7 +380,7 @@ void TextureMapping::UpdateUniformBuffers() {
   ubo.mvp = proj * view * model;
 
   // ユニフォームバッファへコピーします。
-  uniformBuffer.CopyTo(&ubo, sizeof(ubo));
+  uniformBuffer.Copy(&ubo, sizeof(ubo));
 }
 
 void TextureMapping::OnUpdateUIOverlay() {
