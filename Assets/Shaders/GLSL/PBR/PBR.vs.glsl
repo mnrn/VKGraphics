@@ -10,7 +10,6 @@ layout (binding=0) uniform UniformBufferObject {
     mat4 Model;
     mat4 View;
     mat4 Proj;
-    vec3 CamPos;
 } UBO;
 
 layout (push_constant) uniform PushConstants {

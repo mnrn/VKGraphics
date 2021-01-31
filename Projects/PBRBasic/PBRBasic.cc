@@ -103,15 +103,40 @@ void PBRBasic::BuildCommandBuffers() {
     vkCmdBindIndexBuffer(drawCmdBuffers[i], model.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
 
-    for (const auto x : {-1.0f, 1.0f}) {
-      const glm::vec3 pos = glm::vec3(x, 0.0f, 0.0);
+    // Spot左側
+    {
+      const glm::vec3 pos = glm::vec3(-1.0f, 0.0f, 0.0);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3),
                          &pos);
+      Material mat{};
+      mat.rough = settings.metalRough;
+      mat.metal = 1.0f;
+      mat.reflect = settings.dielectricReflectance;
+      mat.r = settings.metalSpecular.r;
+      mat.g = settings.metalSpecular.g;
+      mat.b = settings.metalSpecular.b;
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::vec3),
-                         sizeof(Material::PushConst),
-                         &materials[materialIdx].params);
+                         sizeof(mat), &mat);
+      vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
+    }
+    // Spot右側
+    {
+      const glm::vec3 pos = glm::vec3(1.0f, 0.0f, 0.0);
+      vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3),
+                         &pos);
+      Material mat{};
+      mat.rough = settings.dielectricRough;
+      mat.metal = 0.0f;
+      mat.reflect = settings.dielectricReflectance;
+      mat.r = settings.dielectricBaseColor.r;
+      mat.g = settings.dielectricBaseColor.g;
+      mat.b = settings.dielectricBaseColor.b;
+      vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
+                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::vec3),
+                         sizeof(mat), &mat);
       vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
     }
 
@@ -122,6 +147,14 @@ void PBRBasic::BuildCommandBuffers() {
     // レンダーパスを終了すると、フレームバッファのカラーアタッチメントに移行する暗黙のバリアが追加されます。
     VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
   }
+}
+
+void PBRBasic::OnUpdate(float t) {
+  const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
+  prevTime = t;
+
+  lightAngle = glm::mod(lightAngle + deltaT, glm::two_pi<float>());
+  UpdateLights();
 }
 
 void PBRBasic::ViewChanged() { UpdateUniformBuffers(); }
@@ -135,18 +168,6 @@ void PBRBasic::LoadAssets() {
   const auto result =
       model.LoadFromFile(device, modelPath, queue, vertexLayout);
   BOOST_ASSERT_MSG(result, "Failed to load model!");
-
-  materials.emplace_back("Iron", glm::vec3(0.560f, 0.570f, 0.580f));
-  materials.emplace_back("Silver", glm::vec3(0.972f, 0.960f, 0.915f));
-  materials.emplace_back("Aluminium", glm::vec3(0.913f, 0.921f, 0.925f));
-  materials.emplace_back("Gold", glm::vec3(1.000f, 0.766f, 0.336f));
-  materials.emplace_back("Copper", glm::vec3(0.955f, 0.637f, 0.538f));
-  materials.emplace_back("Chromium", glm::vec3(0.550f, 0.556f, 0.556f));
-  materials.emplace_back("Nickel", glm::vec3(0.660f, 0.609f, 0.526f));
-  materials.emplace_back("Titanium", glm::vec3(0.542f, 0.497f, 0.449f));
-  materials.emplace_back("Cobalt", glm::vec3(0.662f, 0.665f, 0.634f));
-  materials.emplace_back("Platinum", glm::vec3(0.672f, 0.637f, 0.585f));
-  materialIdx = 3;
 }
 
 //*-----------------------------------------------------------------------------
@@ -160,9 +181,8 @@ void PBRBasic::LoadAssets() {
  */
 void PBRBasic::SetupDescriptorSetLayout() {
   std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-      Initializer::DescriptorSetLayoutBinding(
-          VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+      Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                              VK_SHADER_STAGE_VERTEX_BIT, 0),
       Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                               VK_SHADER_STAGE_FRAGMENT_BIT, 1),
   };
@@ -172,23 +192,57 @@ void PBRBasic::SetupDescriptorSetLayout() {
   VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
       device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
 
-  std::vector<VkPushConstantRange> pushConstantRanges = {
-      Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT,
-                                     sizeof(glm::vec3), 0),
-      Initializer::PushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT,
-                                     sizeof(Material::PushConst),
-                                     sizeof(glm::vec3)),
-  };
-
   // この記述子セットレイアウトに基づくレンダリングパイプラインを生成するために使用されるパイプラインレイアウトを作成します。
   // より複雑なシナリオでは、再利用できる記述子セットのレイアウトごとに異なるパイプラインレイアウトがあります。
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
       Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
+
+  std::vector<VkPushConstantRange> pushConstantRanges = {
+      Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT,
+                                     sizeof(glm::vec3), 0),
+      Initializer::PushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT,
+                                     sizeof(Material), sizeof(glm::vec3)),
+  };
   pipelineLayoutCreateInfo.pushConstantRangeCount =
       static_cast<uint32_t>(pushConstantRanges.size());
   pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
   VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
                                          nullptr, &pipelineLayout));
+}
+
+void PBRBasic::SetupDescriptorPool() {
+  // APIに記述子の最大数を通知する必要があります。
+  std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16),
+  };
+
+  // グローバル記述子プールを生成します。
+  VkDescriptorPoolCreateInfo descriptorPoolInfo =
+      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes, 2);
+
+  VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
+                                         &descriptorPool));
+}
+
+void PBRBasic::SetupDescriptorSet() {
+  // グローバル記述子プールから新しい記述子セットを割り当てます。
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo =
+      Initializer::DescriptorSetAllocateInfo(descriptorPool,
+                                             &descriptorSetLayout, 1);
+  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                                           &descriptorSet));
+
+  std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+      Initializer::WriteDescriptorSet(descriptorSet,
+                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+                                      &uniformBuffers.object.descriptor),
+      Initializer::WriteDescriptorSet(descriptorSet,
+                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+                                      &uniformBuffers.params.descriptor),
+  };
+  vkUpdateDescriptorSets(device,
+                         static_cast<uint32_t>(writeDescriptorSets.size()),
+                         writeDescriptorSets.data(), 0, nullptr);
 }
 
 /**
@@ -303,47 +357,12 @@ void PBRBasic::SetupPipelines() {
   vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
 }
 
-void PBRBasic::SetupDescriptorPool() {
-  // APIに記述子の最大数を通知する必要があります。
-  std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
-      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-  };
-
-  // グローバル記述子プールを生成します。
-  VkDescriptorPoolCreateInfo descriptorPoolInfo =
-      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes, 2);
-
-  VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
-                                         &descriptorPool));
-}
-
-void PBRBasic::SetupDescriptorSet() {
-  // グローバル記述子プールから新しい記述子セットを割り当てます。
-  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo =
-      Initializer::DescriptorSetAllocateInfo(descriptorPool,
-                                             &descriptorSetLayout, 1);
-  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                                           &descriptorSet));
-
-  std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-      Initializer::WriteDescriptorSet(descriptorSet,
-                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                      &uniformBuffers.object.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSet,
-                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
-                                      &uniformBuffers.params.descriptor),
-  };
-  vkUpdateDescriptorSets(device,
-                         static_cast<uint32_t>(writeDescriptorSets.size()),
-                         writeDescriptorSets.data(), 0, nullptr);
-}
-
 //*-----------------------------------------------------------------------------
 // Prepare
 //*-----------------------------------------------------------------------------
 
 void PBRBasic::PrepareCamera() {
-  camera.SetupOrient(glm::vec3(0.0f, 0.0f, -3.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+  camera.SetupOrient(glm::vec3(0.0f, 1.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f),
                      glm::vec3(0.0f, 1.0f, 0.0f));
   camera.SetupPerspective(glm::radians(60.0f),
                           static_cast<float>(swapchain.extent.width) /
@@ -382,18 +401,26 @@ void PBRBasic::PrepareUniformBuffers() {
 
 void PBRBasic::UpdateUniformBuffers() {
   // 行列をシェーダーに渡します。
-  ubo.model = glm::mat4(1.0f);
+  ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
+                          glm::vec3(0.0f, 1.0f, 0.0f));
   ubo.view = camera.GetViewMatrix();
   ubo.proj = camera.GetProjectionMatrix();
-  ubo.eye = camera.GetPosition();
 
   // ユニフォームバッファへコピーします。
   uniformBuffers.object.Copy(&ubo, sizeof(ubo));
 }
 
 void PBRBasic::UpdateLights() {
-  uboParams.light[0] = glm::vec4(7.0f, 1.5f, 0.0f, 1.0f);
-  uboParams.light[1] = glm::vec4(0.0f, 1.5f, 3.0f, 1.0f);
+  uboParams.eye = -1.0f * camera.GetPosition();
+  uboParams.lights[0].pos = glm::vec4(3.0f * std::cos(lightAngle), 0.0f,
+                                      3.0f * std::sin(lightAngle), 1.0f);
+  uboParams.lights[0].intensity = 25.0f;
+  uboParams.lights[1].pos = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+  uboParams.lights[1].intensity = 5.0f;
+  uboParams.lights[2].pos = glm::vec4(0.0f, 0.0f, -3.0f, 1.0f);
+  uboParams.lights[2].intensity = 25.0f;
+
+  uboParams.lightsNum = 3;
 
   uniformBuffers.params.Copy(&uboParams, sizeof(uboParams));
 }

@@ -2,22 +2,22 @@
 
 const float PI = 3.14159265358979323846264;
 const float GAMMA = 2.2;
-const int LIGHT_MAX = 2;
+const int LIGHTS_MAX = 8;
 
 layout (location=0) in vec3 Position;
 layout (location=1) in vec3 Normal;
 
 layout (location=0) out vec4 FragColor;
 
-layout (binding=0) uniform UniformBufferObject {
-    mat4 Model;
-    mat4 View;
-    mat4 Proj;
-    vec3 CamPos;
-} UBO;
+struct LightInfo {
+    vec4 Position;
+    float Intensity;
+};
 
 layout (binding=1) uniform UniformBufferObjectShared {
-    vec4 Light[LIGHT_MAX];
+    vec3 CamPos;
+    LightInfo Lights[LIGHTS_MAX];
+    int LightsNum
 } UBOParams;
 
 layout (push_constant) uniform PushConstants {
@@ -68,17 +68,17 @@ vec3 MicroFacetModel(int lightIdx, vec3 pos, vec3 n) {
 
     // ライトに関して。
     vec3 l = vec3(0.0);
-    float lightIntensity = 45.0;
-    if (UBOParams.Light[lightIdx].w == 0.0) {    // Directional Lightの場合
-        l = normalize(UBOParams.Light[lightIdx].xyz);
+    float lightIntensity = UBOParams.Lights[lightIdx].Intensity;
+    if (UBOParams.Lights[lightIdx].Position.w == 0.0) {    // Directional Lightの場合
+        l = normalize(UBOParams.Lights[lightIdx].Position.xyz);
     } else {                                    // Positional Lightの場合 
-        l = UBOParams.Light[lightIdx].xyz - pos;
+        l = UBOParams.Lights[lightIdx].Position.xyz - pos;
         float dist = length(l);
         l = normalize(l);
         lightIntensity /= (dist * dist);
     }
 
-    vec3 v = normalize(UBO.CamPos - pos);   // 視線ベクトル
+    vec3 v = normalize(UBOParams.CamPos - pos);   // 視線ベクトル
     vec3 h = normalize(v + l);              // ハーフベクトル(Bling-Phongモデルと同じ)
     float NoV = abs(dot(n, v)) + 1e-5;
     float NoL = clamp(dot(n, l), 0.0, 1.0);
@@ -101,7 +101,7 @@ void main() {
     vec3 color = vec3(0.0);
     vec3 n = normalize(Normal);
 
-    for (int i =0; i < LIGHT_MAX; i++) {
+    for (int i = 0; i < UBOParams.LightsNum; i++) {
         color += MicroFacetModel(i, Position, n);
     }
 

@@ -14,6 +14,7 @@ class PBRBasic : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;
+  void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
   void PrepareCamera();
@@ -36,30 +37,26 @@ private:
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-    alignas(16) glm::vec3 eye;
   } ubo;
 
+  struct Light {
+    alignas(16) glm::vec4 pos;
+    alignas(4) float intensity;
+  };
   struct UniformBufferObjectShared {
-    alignas(16) glm::vec4 light[2];
+    alignas(16) glm::vec3 eye;
+    Light lights[8];
+    alignas(4) int lightsNum;
   } uboParams;
 
   struct Material {
-    std::string name;
-    struct PushConst {
-      float rough;
-      float metal;
-      float reflect;
-      float r;
-      float g;
-      float b;
-    } params;
-    Material(std::string &&matName, const glm::vec3 color)
-        : name(std::move(matName)),
-          params({0.5f, 0.5f, 0.5f, color.r, color.g, color.b}) {}
+    float rough;
+    float metal;
+    float reflect;
+    float r;
+    float g;
+    float b;
   };
-  std::vector<Material> materials{};
-  uint32_t materialIdx = 0;
-
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
 
@@ -77,4 +74,30 @@ private:
     Buffer object{};
     Buffer params{};
   } uniformBuffers;
+
+  float prevTime = 0.0f;
+  float lightAngle = 0.0f;
+
+  enum struct MetalColor : std::uint32_t {
+    Nil,
+    Iron,
+    Silver,
+    Aluminum,
+    Gold,
+    Copper,
+    Chromium,
+    Nickel,
+    Titanium,
+    Cobalt,
+    Platinum,
+  };
+  struct Settings {
+    glm::vec3 metalSpecular{1.0f, 0.71f, 0.29f};
+    float metalRough = 0.43f;
+    MetalColor metalColor = MetalColor::Nil;
+
+    glm::vec3 dielectricBaseColor{0.2f, 0.33f, 0.17f};
+    float dielectricRough = 0.43f;
+    float dielectricReflectance = 0.5f;
+  } settings;
 };
