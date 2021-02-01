@@ -10,18 +10,18 @@ layout (binding=0) uniform UniformBufferObject {
     mat4 Model;
     mat4 View;
     mat4 Proj;
-} UBO;
+} ubo;
 
 layout (push_constant) uniform PushConstants {
     vec3 ObjPos;
-} PushConsts;
+} pushConsts;
 
 out gl_PerVertex {
     vec4 gl_Position;
 };
 
 void main() {
-    Position = vec3(UBO.Model * vec4(VertexPosition, 1.0)) + PushConsts.ObjPos;
-    Normal = mat3(UBO.Model) * VertexNormal;
-    gl_Position = UBO.Proj * UBO.View * vec4(Position, 1.0);
+    Position = vec3(ubo.Model * vec4(VertexPosition, 1.0)) + pushConsts.ObjPos;
+    Normal = mat3(ubo.Model) * VertexNormal;
+    gl_Position = ubo.Proj * ubo.View * vec4(Position, 1.0);
 }
