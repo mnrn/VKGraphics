@@ -39,15 +39,14 @@ AndroidやiOSの対応は未定になります。
 
 - [GLFW]
 - [GLM]
-- [boost]
-- [fmt]
-- [stb]
-- [tinyobjloader]
-- [freetype]
-- [spdlog]
+- [GLI]
+- [assimp]
 - [imgui]
 - [nlohmann-json]
-
+- [fmt]
+- [spdlog]
+- [boost]
+  
 リポジトリのルートディレクトリにCMakeLists.txtがあるので詳しくはそちらを参照ください。  
 
 ## 参考
@@ -57,14 +56,17 @@ AndroidやiOSの対応は未定になります。
 [Unity 2018 Shaders and Effects Cookbook - Third Edition](https://www.packtpub.com/product/unity-2018-shaders-and-effects-cookbook-third-edition/9781788396233)  
 [Physically Based Rendering in Filament](https://google.github.io/filament/Filament.md.html)
 
-[boost]:<https://www.boost.org/>
 [GLFW]:<https://www.glfw.org/>
-[glad]:<https://github.com/Dav1dde/glad>
 [GLM]:<https://github.com/g-truc/glm>
+[GLI]:<https://github.com/g-truc/gli>
+[assimp]:<https://github.com/assimp/assimp>
+[imgui]:<https://github.com/ocornut/imgui>
+[nlohmann-json]:<https://github.com/nlohmann/json>
 [fmt]:<https://github.com/fmtlib/fmt>
+[spdlog]:<https://github.com/gabime/spdlog>
+[boost]:<https://www.boost.org/>
+
+[glad]:<https://github.com/Dav1dde/glad>
 [stb]:<https://github.com/nothings/stb>
 [tinyobjloader]:<https://github.com/tinyobjloader/tinyobjloader>
 [freetype]:<https://www.freetype.org/>
-[spdlog]:<https://github.com/gabime/spdlog>
-[imgui]:<https://github.com/ocornut/imgui>
-[nlohmann-json]:<https://github.com/nlohmann/json>
