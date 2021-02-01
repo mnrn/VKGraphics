@@ -19,10 +19,10 @@ struct VSOutput {
     [[vk::location(1)]] float3 Normal : NORMAL0;
 };
 
-struct PushConsts {
+struct PushConstants {
     float3 ObjPos;
 };
-[[vk::push_constant]] PushConsts pushConsts;
+[[vk::push_constant]] PushConstants pushConsts;
 
 VSOutput main(VSInput input) {
     VSOutput output = (VSOutput)0;
