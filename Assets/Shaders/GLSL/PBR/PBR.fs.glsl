@@ -17,7 +17,7 @@ struct LightInfo {
 layout (binding=1) uniform UniformBufferObjectShared {
     vec3 CamPos;
     LightInfo Lights[LIGHTS_MAX];
-    int LightsNum
+    int LightsNum;
 } UBOParams;
 
 layout (push_constant) uniform PushConstants {
