@@ -9,7 +9,7 @@
 #include "PBRBasic.h"
 
 int main() {
-  const auto config = Json::Parse("./Projects/PBRBasic/Config.json");
+  const auto config = Json::Parse("./Configs/ScenePBRBasic.json");
   BOOST_ASSERT_MSG(config, "Failed to open Config.json!");
 
   App app(config.value());
