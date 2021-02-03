@@ -54,7 +54,11 @@ AndroidやiOSの対応は未定になります。
 [OpenGL 4 Shading Language Cookbook - Third Edition](https://www.packtpub.com/product/opengl-4-shading-language-cookbook-third-edition/9781789342253)  
 [HLSL Development Cookbook](https://www.packtpub.com/product/hlsl-development-cookbook/9781849694209)  
 [Unity 2018 Shaders and Effects Cookbook - Third Edition](https://www.packtpub.com/product/unity-2018-shaders-and-effects-cookbook-third-edition/9781788396233)  
-[Physically Based Rendering in Filament](https://google.github.io/filament/Filament.md.html)
+[Physically Based Rendering in Filament](https://google.github.io/filament/Filament.md.html)  
+[Advanced-Lighting - SSAO](https://learnopengl.com/Advanced-Lighting/SSAO)  
+[Cascaded Shadow Maps](https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf)  
+[GPU Gems3 Chapter 10. Parallel-Split Shadow Maps on Programmable GPUs](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus)
+[Examples and demos for the new Vulkan API](https://github.com/SaschaWillems/Vulkan)
 
 [GLFW]:<https://www.glfw.org/>
 [GLM]:<https://github.com/g-truc/glm>
