@@ -1,0 +1,8 @@
+{
+    "AppName": "Hello Triangle",
+    "Width": 1280,
+    "Height": 720,
+    "Samples": 0,
+    "VertexShader": "./Assets/shaders/HLSL/SPIR-V/Basics/Basic.vs.spv",
+    "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Basics/Basic.fs.spv"
+}
