@@ -1,5 +1,5 @@
 """
-@file sl2spv.py
+@file spv_conv.py
 @brief すべてのglslおよびhlslをspir-vにコンパイルします。
 """
 
@@ -15,7 +15,7 @@ class Compiler(object):
     def __init__(self, logger=None):
         scripts_path = Path('.').resolve()
         working_directory_path = scripts_path.parent
-        self.SHADER_PATH = working_directory_path.joinpath(
+        self.SHADERS_PATH = working_directory_path.joinpath(
             'Assets', 'Shaders')
 
         # ロガーの設定
@@ -39,7 +39,7 @@ class Compiler(object):
     def compiles(self, lang):
         self.logger.info(lang + ' - start compile.')
 
-        for root, dirs, files in os.walk(self.SHADER_PATH.joinpath(lang)):
+        for root, dirs, files in os.walk(self.SHADERS_PATH.joinpath(lang)):
             [self.compile(f, root) for f in files if f.endswith('lsl')]
 
         self.logger.info(lang + ' - finished compile.')
