@@ -87,5 +87,6 @@ set(TARGETS
     HelloTriangle
     TextureMapping
     PBRBasic
+    Deferred
     )
 buildAll()

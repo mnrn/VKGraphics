@@ -5,7 +5,6 @@
 
 #include <array>
 #include <boost/assert.hpp>
-#include <imgui.h>
 #include <vector>
 
 #include "VK/Common.h"

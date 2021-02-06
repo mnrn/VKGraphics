@@ -21,10 +21,10 @@
 namespace Window {
 
 static inline GLFWwindow *Create(int w, int h, const char *title, int samples,
-                                 GLFWmonitor *monitor = nullptr,
+                                 bool resizable, GLFWmonitor *monitor = nullptr,
                                  GLFWwindow *share = nullptr) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+  glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 
   if (samples > 0) {
     glfwWindowHint(GLFW_SAMPLES, samples);

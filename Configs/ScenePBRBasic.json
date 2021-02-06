@@ -3,9 +3,10 @@
     "Width" : 1280,
     "Height" : 720,
     "Samples" : 0,
+    "Resizable": true,
     "UIOverlay": true,
     "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/PBR/PBR.vs.spv",
     "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/PBR/PBR.fs.spv",
-    "Model" : "./Assets/Models/OBJ/Spot/spot_triangulated.obj"
+    "Model" : "./Assets/Models/Obj/Spot/spot_triangulated.obj"
 }
   
