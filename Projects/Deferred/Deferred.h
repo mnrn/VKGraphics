@@ -39,29 +39,17 @@ public:
   void ViewChanged() override;
 
 private:
-  struct {
-    struct {
-      Texture2D colorMap;
-      Texture2D normalMap;
-    } model;
-    struct {
-      Texture2D colorMap;
-      Texture2D normalMap;
-    } floor;
-  } textures;
-
   VertexLayout vertexLayout{
       {
           VertexLayoutComponent::Position,
-          VertexLayoutComponent::UV,
           VertexLayoutComponent::Color,
           VertexLayoutComponent::Normal,
-          VertexLayoutComponent::Tangent,
       },
   };
 
   struct {
-    Model model;
+    Model teapot;
+    Model torus;
     Model floor;
   } models;
 
@@ -96,10 +84,9 @@ private:
   VkPipelineLayout pipelineLayout;
 
   struct {
-    VkDescriptorSet model;
-    VkDescriptorSet floor;
+    VkDescriptorSet offscreen;
+    VkDescriptorSet composition;
   } descriptorSets;
-  VkDescriptorSet descriptorSet;
   VkDescriptorSetLayout descriptorSetLayout;
 
   Framebuffer offscreenFramebuffer;

@@ -48,13 +48,9 @@ void Deferred::OnPreDestroy() {
   uniformBuffers.composition.Destroy(device);
   uniformBuffers.offscreen.Destroy(device);
 
-  textures.floor.normalMap.Destroy(device);
-  textures.floor.colorMap.Destroy(device);
-  textures.model.normalMap.Destroy(device);
-  textures.model.colorMap.Destroy(device);
-
   models.floor.Destroy(device);
-  models.model.Destroy(device);
+  models.torus.Destroy(device);
+  models.teapot.Destroy(device);
 }
 
 void Deferred::OnUpdate(float t) {
@@ -103,31 +99,34 @@ void Deferred::ViewChanged() { UpdateOffscreenUniformBuffers(); }
 //*-----------------------------------------------------------------------------
 
 void Deferred::LoadAssets() {
-  ModelCreateInfo modelCreateInfo {};
-  modelCreateInfo.center = glm::vec3(0.0f, -0.75f, 0.0f);
-  modelCreateInfo.scale = glm::vec3(50.0f);
-  modelCreateInfo.uvscale = modelCreateInfo.scale;
-  models.model.LoadFromFile(device, config["Ogre"]["Model"].get<std::string>(),
-                            queue, vertexLayout);
-  models.floor.LoadFromFile(device, config["Floor"]["Model"].get<std::string>(),
-                            queue, vertexLayout, modelCreateInfo);
-
-  textures.model.colorMap.Load(
-      device, config["Ogre"]["ColorMap"].get<std::string>(), queue,
-      VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false);
-  textures.model.normalMap.Load(
-      device, config["Ogre"]["NormalMap"].get<std::string>(), queue,
-      VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false);
-  textures.floor.colorMap.Load(
-      device, config["Floor"]["ColorMap"].get<std::string>(), queue,
-      VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false);
-  textures.floor.normalMap.Load(
-      device, config["Floor"]["NormalMap"].get<std::string>(), queue,
-      VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false);
+  ModelCreateInfo modelCreateInfo{};
+  // Teapot
+  {
+    modelCreateInfo.scale = glm::vec3(0.3f);
+    modelCreateInfo.color = glm::vec3(0.9f);
+    models.teapot.LoadFromFile(device,
+                               config["Teapot"]["Model"].get<std::string>(),
+                               queue, vertexLayout, modelCreateInfo);
+  }
+  // Torus
+  {
+    modelCreateInfo.scale = glm::vec3(1.0f);
+    modelCreateInfo.center = glm::vec3(-3.0f, 0.0f, -3.0f);
+    modelCreateInfo.color = glm::vec3(0.9f, 0.5f, 0.2f);
+    models.torus.LoadFromFile(device,
+                              config["Torus"]["Model"].get<std::string>(),
+                              queue, vertexLayout, modelCreateInfo);
+  }
+  // Floor
+  {
+    modelCreateInfo.center = glm::vec3(0.0f, -0.75f, 0.0f);
+    modelCreateInfo.scale = glm::vec3(50.0f);
+    modelCreateInfo.uvscale = modelCreateInfo.scale;
+    modelCreateInfo.color = glm::vec3(0.4f);
+    models.floor.LoadFromFile(device,
+                              config["Floor"]["Model"].get<std::string>(),
+                              queue, vertexLayout, modelCreateInfo);
+  }
 }
 
 //*-----------------------------------------------------------------------------
@@ -178,7 +177,7 @@ void Deferred::SetupDescriptorPool() {
 
   // グローバル記述子プールを生成します。
   VkDescriptorPoolCreateInfo descriptorPoolInfo =
-      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes, 3);
+      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes, 2);
 
   VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
                                          &descriptorPool));
@@ -203,18 +202,18 @@ void Deferred::SetupDescriptorSet() {
 
   // Deferred Composition
   VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                                           &descriptorSet));
+                                           &descriptorSets.composition));
   std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-      Initializer::WriteDescriptorSet(descriptorSet,
+      Initializer::WriteDescriptorSet(descriptorSets.composition,
                                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                       1, &texPosDesc),
-      Initializer::WriteDescriptorSet(descriptorSet,
+      Initializer::WriteDescriptorSet(descriptorSets.composition,
                                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                       2, &texNormDesc),
-      Initializer::WriteDescriptorSet(descriptorSet,
+      Initializer::WriteDescriptorSet(descriptorSets.composition,
                                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                       3, &texAlbedoDesc),
-      Initializer::WriteDescriptorSet(descriptorSet,
+      Initializer::WriteDescriptorSet(descriptorSets.composition,
                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4,
                                       &uniformBuffers.composition.descriptor),
   };
@@ -222,37 +221,13 @@ void Deferred::SetupDescriptorSet() {
                          static_cast<uint32_t>(writeDescriptorSets.size()),
                          writeDescriptorSets.data(), 0, nullptr);
 
-  // Offscreen Model
+  // Offscreen Rendering
   VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                                           &descriptorSets.model));
+                                           &descriptorSets.offscreen));
   writeDescriptorSets = {
-      Initializer::WriteDescriptorSet(descriptorSets.model,
+      Initializer::WriteDescriptorSet(descriptorSets.offscreen,
                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
                                       &uniformBuffers.offscreen.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSets.model,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      1, &textures.model.colorMap.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSets.model,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      2, &textures.model.normalMap.descriptor),
-  };
-  vkUpdateDescriptorSets(device,
-                         static_cast<uint32_t>(writeDescriptorSets.size()),
-                         writeDescriptorSets.data(), 0, nullptr);
-
-  // Offscreen Floor
-  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                                           &descriptorSets.floor));
-  writeDescriptorSets = {
-      Initializer::WriteDescriptorSet(descriptorSets.floor,
-                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                      &uniformBuffers.offscreen.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSets.floor,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      1, &textures.floor.colorMap.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSets.floor,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      2, &textures.floor.normalMap.descriptor),
   };
   vkUpdateDescriptorSets(device,
                          static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -354,18 +329,12 @@ void Deferred::SetupPipelines() {
       // location = 0 : position
       Initializer::VertexInputAttributeDescription(
           0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
-      // location = 1 : texture coordinates
+      // location = 1 : color
       Initializer::VertexInputAttributeDescription(
-          0, 1, VK_FORMAT_R32G32_SFLOAT, 3 * sizeof(float)),
-      // location = 2 : color
+          0, 1, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)),
+      // location = 2 : normal
       Initializer::VertexInputAttributeDescription(
-          0, 2, VK_FORMAT_R32G32B32_SFLOAT, 5 * sizeof(float)),
-      // location = 3 : normal
-      Initializer::VertexInputAttributeDescription(
-          0, 3, VK_FORMAT_R32G32B32_SFLOAT, 8 * sizeof(float)),
-      // location = 4 : tangent
-      Initializer::VertexInputAttributeDescription(
-          0, 4, VK_FORMAT_R32G32B32_SFLOAT, 11 * sizeof(float)),
+          0, 2, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)),
   };
   VkPipelineVertexInputStateCreateInfo vertexInputState =
       Initializer::PipelineVertexInputStateCreateInfo(vertexInputBindings,
@@ -404,12 +373,12 @@ void Deferred::SetupPipelines() {
 //*-----------------------------------------------------------------------------
 
 void Deferred::PrepareCamera() {
-  camera.SetupOrient(glm::vec3(0.0f, 1.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+  camera.SetupOrient(glm::vec3(-5.0f, 1.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                      glm::vec3(0.0f, 1.0f, 0.0f));
   camera.SetupPerspective(glm::radians(60.0f),
                           static_cast<float>(swapchain.extent.width) /
                               static_cast<float>(swapchain.extent.height),
-                          1.0f, 100.0f);
+                          0.3f, 100.0f);
 }
 
 /**
@@ -527,7 +496,8 @@ void Deferred::BuildCommandBuffers() {
 
     // 記述子セットとパイプラインのバインド
     vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+                            pipelineLayout, 0, 1, &descriptorSets.composition,
+                            0, nullptr);
     vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines.composition);
 
@@ -590,28 +560,43 @@ void Deferred::BuildDeferredCommandBuffer() {
                     pipelines.offscreen);
   VkDeviceSize offsets[] = {0};
 
+  // Teapot
+  {
+    // Instanced Models
+    vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
+                            nullptr);
+    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
+                           &models.teapot.vertices.buffer, offsets);
+    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.teapot.indices.buffer, 0,
+                         VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(offscreenCmdBuffer, models.teapot.indexCount, 3, 0, 0, 0);
+  }
+
+  // Torus
+  {
+    vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
+                            nullptr);
+    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
+                           &models.torus.vertices.buffer, offsets);
+    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.torus.indices.buffer, 0,
+                         VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(offscreenCmdBuffer, models.torus.indexCount, 1, 0, 0, 0);
+  }
+
   // Floor
-  vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipelineLayout, 0, 1, &descriptorSets.floor, 0,
-                          nullptr);
-  vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
-                         &models.floor.vertices.buffer, offsets);
-  vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
-                       VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
+  {
+    vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
+                            nullptr);
+    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
+                           &models.floor.vertices.buffer, offsets);
+    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
+                         VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
+  }
 
-
-  /*
-  // Instanced Models
-  vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipelineLayout, 0, 1, &descriptorSets.model, 0,
-                          nullptr);
-  vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
-                         &models.model.vertices.buffer, offsets);
-  vkCmdBindIndexBuffer(offscreenCmdBuffer, models.model.indices.buffer, 0,
-                       VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(offscreenCmdBuffer, models.model.indexCount, 3, 0, 0, 0);
-*/
   vkCmdEndRenderPass(offscreenCmdBuffer);
   VK_CHECK_RESULT(vkEndCommandBuffer(offscreenCmdBuffer));
 }
