@@ -130,8 +130,8 @@ void TextureMapping::ViewChanged() { UpdateUniformBuffers(); }
 //*-----------------------------------------------------------------------------
 
 void TextureMapping::LoadAssets() {
-  texture.Load(device, "./Assets/Textures/ktx/Brick/ruin_wall_01.ktx",
-               VK_FORMAT_R8G8B8A8_SRGB, queue);
+  texture.Load(device, "./Assets/Textures/dds/dxt5/Brick/ruin_wall_01.dds",
+               queue, VK_FORMAT_BC3_SRGB_BLOCK);
 }
 
 //*-----------------------------------------------------------------------------

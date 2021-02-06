@@ -12,8 +12,8 @@
 #include <boost/assert.hpp>
 #include <boost/noncopyable.hpp>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <memory>
+#include <nlohmann/json.hpp>
 
 #include "VK/VkBase.h"
 #include "Window.h"
@@ -33,8 +33,10 @@ public:
     const auto width = config["Width"].get<int>();
     const auto height = config["Height"].get<int>();
     const auto samples = config["Samples"].get<int>();
+    const auto resizable =
+        config.contains("Resizable") && config["Resizable"].get<bool>();
 
-    window_ = Window::Create(width, height, appName.c_str(), samples);
+    window_ = Window::Create(width, height, appName.c_str(), samples, resizable);
     config_ = config;
   }
 

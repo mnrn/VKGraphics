@@ -49,7 +49,7 @@ class Converter(object):
         # 詳しくは https://github.com/KhronosGroup/KTX-Software
         self.logger.info('Start convert: {}'.format(src))
         cp = subprocess.run(
-            ['toktx', '--2d', '--genmipmap', dst, src])
+            ['toktx', '--2d', '--genmipmap', '--srgb', dst, src])
         if cp.returncode != 0:
             self.logger.error('Failed to convert: {}'.format(src))
         else:
@@ -82,5 +82,5 @@ class Converter(object):
 
 if __name__ == '__main__':
     converter = Converter()
-    #converter.png2ktx()
+    converter.png2ktx()
     converter.png2dds()
