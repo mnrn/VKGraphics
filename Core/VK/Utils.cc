@@ -64,6 +64,67 @@ CreateShader(const Device &device, const std::string &filepath,
   return info;
 }
 
+VkResult CreateImage(const Device &device, VkImage &image,
+                     VkDeviceMemory &memory, VkFormat format,
+                     VkImageType imageType, uint32_t width, uint32_t height,
+                     uint32_t depth, uint32_t mipLevels, uint32_t arrayLayers,
+                     VkMemoryPropertyFlags memoryFlags,
+                     VkImageUsageFlags usage, VkImageTiling tiling,
+                     VkSampleCountFlagBits samples, VkImageCreateFlags flags) {
+  VkImageCreateInfo imageCreateInfo = Initializer::ImageCreateInfo();
+  imageCreateInfo.imageType = imageType;
+  imageCreateInfo.format = format;
+  imageCreateInfo.extent.width = width;
+  imageCreateInfo.extent.height = height;
+  imageCreateInfo.extent.depth = depth;
+  imageCreateInfo.mipLevels = mipLevels;
+  imageCreateInfo.arrayLayers = arrayLayers;
+  imageCreateInfo.samples = samples;
+  imageCreateInfo.tiling = tiling;
+  imageCreateInfo.usage = usage;
+  imageCreateInfo.flags = flags;
+  imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  if (arrayLayers == 6) {
+    imageCreateInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+  }
+
+  VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &image));
+
+  VkMemoryRequirements memoryRequirements{};
+  vkGetImageMemoryRequirements(device, image, &memoryRequirements);
+
+  VkMemoryAllocateInfo memoryAllocateInfo{};
+  memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  memoryAllocateInfo.memoryTypeIndex =
+      device.FindMemoryType(memoryRequirements.memoryTypeBits, memoryFlags);
+
+  VK_CHECK_RESULT(
+      vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &memory));
+
+  VK_CHECK_RESULT(vkBindImageMemory(device, image, memory, 0));
+
+  return VK_SUCCESS;
+}
+
+VkResult CreateImageView(const Device &device, VkImageView &view, VkImage image,
+                         VkImageViewType type, VkFormat format,
+                         const VkImageSubresourceRange &subresourceRange,
+                         VkComponentSwizzle r, VkComponentSwizzle g,
+                         VkComponentSwizzle b, VkComponentSwizzle a) {
+  VkImageViewCreateInfo imageViewCreateInfo =
+      Initializer::ImageViewCreateInfo();
+  imageViewCreateInfo.image = image;
+  imageViewCreateInfo.viewType = type;
+  imageViewCreateInfo.format = format;
+  imageViewCreateInfo.components.r = r;
+  imageViewCreateInfo.components.g = g;
+  imageViewCreateInfo.components.b = b;
+  imageViewCreateInfo.components.a = a;
+  imageViewCreateInfo.subresourceRange = subresourceRange;
+  return vkCreateImageView(device, &imageViewCreateInfo, nullptr, &view);
+}
+
 VkResult CreateImageView(const Device &device, VkImageView &view, VkImage image,
                          VkImageViewType type, VkFormat format,
                          VkImageAspectFlags aspectFlags, uint32_t baseMipLevel,

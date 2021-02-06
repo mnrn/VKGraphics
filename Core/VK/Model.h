@@ -65,7 +65,7 @@ struct ModelCreateInfo {
 };
 
 struct Model {
-  [[nodiscard]] bool LoadFromFile(const Device &device,
+  bool LoadFromFile(const Device &device,
                                   const std::string &filepath,
                                   VkQueue copyQueue,
                                   const VertexLayout &vertexLayout,

@@ -8,9 +8,19 @@
 struct Device;
 
 VkPipelineShaderStageCreateInfo
-CreateShader(const Device& device, const std::string &filepath,
-       VkShaderStageFlagBits stage,
-       VkSpecializationInfo *specialization = nullptr);
+CreateShader(const Device &device, const std::string &filepath,
+             VkShaderStageFlagBits stage,
+             VkSpecializationInfo *specialization = nullptr);
+
+VkResult CreateImage(
+    const Device &device, VkImage &image, VkDeviceMemory &memory,
+    VkFormat format, VkImageType imageType, uint32_t width, uint32_t height,
+    uint32_t depth = 1, uint32_t mipLevels = 1, uint32_t arrayLayers = 1,
+    VkMemoryPropertyFlags memoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+    VkImageTiling tiling = VK_IMAGE_TILING_LINEAR,
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+    VkImageCreateFlags flags = 0);
 
 VkResult
 CreateImageView(const Device &device, VkImageView &view, VkImage image,

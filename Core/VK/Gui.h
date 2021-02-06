@@ -21,9 +21,12 @@ public:
   void Draw(VkCommandBuffer commandBuffer);
   static void OnResize(uint32_t width, uint32_t height);
 
-  bool Header(const char* label) const;
-  bool SliderFloat(const char* label, float* v, float vmin, float vmax);
-  bool ColorEdit3(const char* label, glm::vec3* color);
+  bool Header(const char *label) const;
+  bool Checkbox(const char *label, bool *v);
+  bool Combo(const char *label, int32_t *v,
+                const std::vector<std::string> &items);
+  bool SliderFloat(const char *label, float *v, float vmin, float vmax);
+  bool ColorEdit3(const char *label, glm::vec3 *color);
 
   uint32_t subpass = 0;
 

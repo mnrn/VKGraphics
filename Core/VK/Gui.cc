@@ -9,6 +9,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <boost/assert.hpp>
 
 #include "VK/Common.h"
@@ -449,6 +450,31 @@ bool Gui::Header(const char *label) const {
   return ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 }
 
+bool Gui::Checkbox(const char *label, bool *v) {
+  const bool res = ImGui::Checkbox(label, v);
+  if (res) {
+    updated = true;
+  }
+  return res;
+}
+
+bool Gui::Combo(const char *label, int32_t *v,
+                   const std::vector<std::string> &items) {
+  if (items.empty()) {
+    return false;
+  }
+  std::vector<const char *> transformed;
+  std::transform(std::begin(items), std::end(items),
+                 std::back_inserter(transformed),
+                 [](const std::string &s) { return s.c_str(); });
+  const auto itemSize = static_cast<uint32_t>(transformed.size());
+  const bool res = ImGui::Combo(label, v, transformed.data(), itemSize, itemSize);
+  if (res) {
+    updated = true;
+  }
+  return res;
+}
+
 bool Gui::SliderFloat(const char *label, float *v, float vmin, float vmax) {
   const bool res = ImGui::SliderFloat(label, v, vmin, vmax);
   if (res) {
@@ -457,7 +483,7 @@ bool Gui::SliderFloat(const char *label, float *v, float vmin, float vmax) {
   return res;
 }
 
-bool Gui::ColorEdit3(const char *label, glm::vec3* color) {
+bool Gui::ColorEdit3(const char *label, glm::vec3 *color) {
   const bool res = ImGui::ColorEdit3(label, reinterpret_cast<float *>(color));
   if (res) {
     updated = true;

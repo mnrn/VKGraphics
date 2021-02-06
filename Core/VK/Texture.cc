@@ -104,15 +104,15 @@ void Texture::Destroy(const Device &device) const {
   vkFreeMemory(device, memory, nullptr);
 }
 
-void Texture::Load(const Device &device, const std::string &filepath,
-                   VkFormat format, VkQueue copyQueue,
-                   VkImageUsageFlags imageUsageFlags, VkImageLayout imageLayout,
-                   bool useStaging) {
+void Texture2D::Load(const Device &device, const std::string &filepath,
+                     VkQueue copyQueue, VkFormat format,
+                     VkImageUsageFlags imageUsageFlags,
+                     VkImageLayout imageLayout, bool useStaging) {
   std::error_code ec;
   if (!std::filesystem::exists(filepath, ec)) {
     std::cerr << "Failed to load texture from " << filepath << std::endl;
     std::cerr << ec.value() << ": " << ec.message() << std::endl;
-    BOOST_ASSERT_MSG(!ec, "Failed to load texture!");
+    BOOST_ASSERT_MSG(ec, "Failed to load texture!");
     return;
   }
 

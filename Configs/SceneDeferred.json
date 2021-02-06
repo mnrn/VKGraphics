@@ -1,0 +1,29 @@
+{
+    "AppName" : "Deferred Shading",
+    "Width" : 1280,
+    "Height" : 720,
+    "Samples" : 0,
+    "Resizable": false,
+    "UIOverlay": true,
+    "Pipelines": {
+        "Offscreen": {
+            "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredOffscreen.vs.spv",
+            "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredOffscreen.fs.spv"
+        },
+        "Composition": {
+            "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredVisualize.vs.spv",
+            "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredVisualize.fs.spv"
+        }
+    },
+    "Ogre": {
+        "Model": "./Assets/Models/Obj/Ogre/bs_ears.obj",
+        "ColorMap": "./Assets/Textures/ktx/Ogre/diffuse.ktx",
+        "NormalMap": "./Assets/Textures/ktx/Ogre/normalmap.ktx"
+    },
+    "Floor": {
+        "Model": "./Assets/Models/Obj/Primitives/plane.obj",
+        "ColorMap": "./Assets/Textures/ktx/Brick/ruin_wall_03.ktx",
+        "NormalMap": "./Assets/Textures/ktx/Brick/ruin_wall_03_norm.ktx"
+    }
+}
+  

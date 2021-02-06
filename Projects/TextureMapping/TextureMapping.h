@@ -30,7 +30,7 @@ public:
   void ViewChanged() override;
 
 private:
-  Texture texture;
+  Texture2D texture;
 
   struct UniformBufferObject {
     alignas(16) glm::mat4 mvp;
