@@ -102,7 +102,7 @@ void Deferred::LoadAssets() {
   ModelCreateInfo modelCreateInfo{};
   // Teapot
   {
-    modelCreateInfo.scale = glm::vec3(0.3f);
+    modelCreateInfo.scale = glm::vec3(0.5f);
     modelCreateInfo.color = glm::vec3(0.9f);
     models.teapot.LoadFromFile(device,
                                config["Teapot"]["Model"].get<std::string>(),
@@ -111,7 +111,7 @@ void Deferred::LoadAssets() {
   // Torus
   {
     modelCreateInfo.scale = glm::vec3(1.0f);
-    modelCreateInfo.center = glm::vec3(-3.0f, 0.0f, -3.0f);
+    modelCreateInfo.center = glm::vec3(3.0f, 0.0f, 0.0f);
     modelCreateInfo.color = glm::vec3(0.9f, 0.5f, 0.2f);
     models.torus.LoadFromFile(device,
                               config["Torus"]["Model"].get<std::string>(),
@@ -121,7 +121,6 @@ void Deferred::LoadAssets() {
   {
     modelCreateInfo.center = glm::vec3(0.0f, -0.75f, 0.0f);
     modelCreateInfo.scale = glm::vec3(50.0f);
-    modelCreateInfo.uvscale = modelCreateInfo.scale;
     modelCreateInfo.color = glm::vec3(0.4f);
     models.floor.LoadFromFile(device,
                               config["Floor"]["Model"].get<std::string>(),
@@ -373,7 +372,7 @@ void Deferred::SetupPipelines() {
 //*-----------------------------------------------------------------------------
 
 void Deferred::PrepareCamera() {
-  camera.SetupOrient(glm::vec3(-5.0f, 1.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+  camera.SetupOrient(glm::vec3(0.0f, 1.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                      glm::vec3(0.0f, 1.0f, 0.0f));
   camera.SetupPerspective(glm::radians(60.0f),
                           static_cast<float>(swapchain.extent.width) /
@@ -616,10 +615,9 @@ void Deferred::UpdateOffscreenUniformBuffers() {
 }
 
 void Deferred::UpdateCompositionUniformBuffers() {
-  uboComposition.viewPos = glm::vec4(camera.GetPosition(), 0.0f) *
-                           glm::vec4(-1.0f, 1.0f, -1.0f, 1.0f);
+  uboComposition.viewPos = glm::vec4(camera.GetPosition(), 0.0f);
 
-  uboComposition.lights[0].pos = glm::vec4(0.0f, 1.5f, 0.0f, 0.0f);
+  uboComposition.lights[0].pos = glm::vec4(0.0f, 3.0f, 1.0f, 1.0f);
   uboComposition.lights[0].color = glm::vec3(1.0f);
   uboComposition.lights[0].radius = 25.0f;
 
