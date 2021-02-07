@@ -3,7 +3,7 @@
     "Width" : 1280,
     "Height" : 720,
     "Samples" : 0,
-    "Resizable": false,
+    "Resizable": true,
     "UIOverlay": true,
     "Pipelines": {
         "Offscreen": {
@@ -23,6 +23,9 @@
     },
     "Floor": {
         "Model": "./Assets/Models/dae/Primitives/plane.dae"
+    },
+    "Camera": {
+        "RotationSpeed": 1.0
     }
 }
   

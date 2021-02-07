@@ -19,11 +19,11 @@ public:
   void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
-  void PrepareCamera();
   void LoadAssets();
   void PrepareOffscreenFramebuffer();
   void PrepareUniformBuffers();
 
+  void UpdateUniformBuffers();
   void UpdateOffscreenUniformBuffers();
   void UpdateCompositionUniformBuffers();
 
@@ -97,6 +97,7 @@ private:
   Camera camera{};
 
   float prevTime = 0.0f;
+  float camAngle = 0.0f;
 
   struct Settings {
     int dispRenderTarget = 0;

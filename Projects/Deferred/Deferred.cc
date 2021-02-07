@@ -18,7 +18,6 @@
 void Deferred::OnPostInit() {
   VkBase::OnPostInit();
 
-  PrepareCamera();
   LoadAssets();
   PrepareOffscreenFramebuffer();
   PrepareUniformBuffers();
@@ -54,8 +53,13 @@ void Deferred::OnPreDestroy() {
 }
 
 void Deferred::OnUpdate(float t) {
-  // const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
+  const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
   prevTime = t;
+
+  camAngle = glm::mod(
+      camAngle + config["Camera"]["RotationSpeed"].get<float>() * deltaT,
+      glm::two_pi<float>());
+  UpdateUniformBuffers();
 }
 
 void Deferred::OnRender() {
@@ -92,7 +96,7 @@ void Deferred::OnRender() {
   VkBase::SubmitFrame();
 }
 
-void Deferred::ViewChanged() { UpdateOffscreenUniformBuffers(); }
+void Deferred::ViewChanged() { UpdateUniformBuffers(); }
 
 //*-----------------------------------------------------------------------------
 // Assets
@@ -371,15 +375,6 @@ void Deferred::SetupPipelines() {
 // Prepare
 //*-----------------------------------------------------------------------------
 
-void Deferred::PrepareCamera() {
-  camera.SetupOrient(glm::vec3(0.0f, 1.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f),
-                     glm::vec3(0.0f, 1.0f, 0.0f));
-  camera.SetupPerspective(glm::radians(60.0f),
-                          static_cast<float>(swapchain.extent.width) /
-                              static_cast<float>(swapchain.extent.height),
-                          0.3f, 100.0f);
-}
-
 /**
  * @brief オフスクリーンレンダリング用に新しいフレームバッファを用意します。
  */
@@ -439,8 +434,7 @@ void Deferred::PrepareUniformBuffers() {
       &uboComposition, sizeof(uboComposition)));
   VK_CHECK_RESULT(uniformBuffers.composition.Map(device));
 
-  UpdateOffscreenUniformBuffers();
-  UpdateCompositionUniformBuffers();
+  UpdateUniformBuffers();
 }
 
 //*-----------------------------------------------------------------------------
@@ -604,6 +598,18 @@ void Deferred::BuildDeferredCommandBuffer() {
 // Update
 //*-----------------------------------------------------------------------------
 
+void Deferred::UpdateUniformBuffers() {
+  camera.SetupOrient(
+      glm::vec3(5.0f * std::sin(camAngle), 1.0f, 5.0f * std::cos(camAngle)),
+      glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  camera.SetupPerspective(glm::radians(60.0f),
+                          static_cast<float>(swapchain.extent.width) /
+                          static_cast<float>(swapchain.extent.height),
+                          0.3f, 100.0f);
+  UpdateOffscreenUniformBuffers();
+  UpdateCompositionUniformBuffers();
+}
+
 void Deferred::UpdateOffscreenUniformBuffers() {
   // 行列をシェーダーに渡します。
   uboOffscreenVS.model = glm::mat4(1.0f);
@@ -617,11 +623,27 @@ void Deferred::UpdateOffscreenUniformBuffers() {
 void Deferred::UpdateCompositionUniformBuffers() {
   uboComposition.viewPos = glm::vec4(camera.GetPosition(), 0.0f);
 
-  uboComposition.lights[0].pos = glm::vec4(0.0f, 3.0f, 1.0f, 1.0f);
+  uboComposition.lights[0].pos = glm::vec4(0.0f, 3.0f, 0.0f, 0.0f);
   uboComposition.lights[0].color = glm::vec3(1.0f);
   uboComposition.lights[0].radius = 25.0f;
 
-  uboComposition.lightsNum = 1;
+  uboComposition.lights[1].pos = glm::vec4(0.0f, 3.0f, 10.0f, 0.0f);
+  uboComposition.lights[1].color = glm::vec3(0.8f, 0.99f, 0.835f);
+  uboComposition.lights[1].radius = 5.0f;
+
+  uboComposition.lights[2].pos = glm::vec4(0.0f, 3.0f, -10.0f, 0.0f);
+  uboComposition.lights[2].color = glm::vec3(0.925f, 0.705f, 0.749f);
+  uboComposition.lights[2].radius = 5.0f;
+
+  uboComposition.lights[3].pos = glm::vec4(10.0f, 3.0f, 0.0f, 0.0f);
+  uboComposition.lights[3].color = glm::vec3(0.749f, 0.701f, 0.988f);
+  uboComposition.lights[3].radius = 5.0f;
+
+  uboComposition.lights[4].pos = glm::vec4(-10.0f, 3.0f, 0.0f, 0.0f);
+  uboComposition.lights[4].color = glm::vec3(0.894f, 0.788f, 0.180f);
+  uboComposition.lights[4].radius = 5.0f;
+
+  uboComposition.lightsNum = 5;
   uboComposition.dispTarget = settings.dispRenderTarget;
 
   uniformBuffers.composition.Copy(&uboComposition, sizeof(uboComposition));
