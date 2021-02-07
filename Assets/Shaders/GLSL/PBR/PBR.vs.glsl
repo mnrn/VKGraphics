@@ -7,13 +7,11 @@ layout (location=0) out vec3 Position;
 layout (location=1) out vec3 Normal;
 
 layout (binding=0) uniform UniformBufferObject {
-    mat4 Model;
-    mat4 View;
-    mat4 Proj;
+    mat4 ViewProj;
 } ubo;
 
 layout (push_constant) uniform PushConstants {
-    vec3 ObjPos;
+    mat4 Model;
 } pushConsts;
 
 out gl_PerVertex {
@@ -21,7 +19,7 @@ out gl_PerVertex {
 };
 
 void main() {
-    Position = vec3(ubo.Model * vec4(VertexPosition, 1.0)) + pushConsts.ObjPos;
-    Normal = mat3(ubo.Model) * VertexNormal;
-    gl_Position = ubo.Proj * ubo.View * vec4(Position, 1.0);
+    Position = vec3(pushConsts.Model * vec4(VertexPosition, 1.0));
+    Normal = mat3(pushConsts.Model) * VertexNormal;
+    gl_Position = ubo.ViewProj * vec4(Position, 1.0);
 }

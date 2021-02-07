@@ -34,8 +34,8 @@ public:
   void PrepareCamera();
   void LoadAssets();
   void PrepareUniformBuffers();
-  void UpdateUniformBuffers();
-  void UpdateLights();
+  void UpdateUniformBufferVS();
+  void UpdateUniformBufferFS();
 
   void SetupDescriptorSetLayout();
   void SetupPipelines();
@@ -47,21 +47,19 @@ public:
   void ViewChanged() override;
 
 private:
-  struct UniformBufferObject {
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-  } ubo;
+  struct UniformBufferObjectVS {
+    alignas(16) glm::mat4 viewProj;
+  } uboVS;
 
   struct Light {
     alignas(16) glm::vec4 pos;
     alignas(4) float intensity;
   };
-  struct UniformBufferObjectShared {
+  struct UniformBufferObjectFS {
     alignas(16) glm::vec3 eye;
     Light lights[8];
     alignas(4) int lightsNum;
-  } uboParams;
+  } uboFS;
 
   struct Material {
     float rough;
@@ -83,7 +81,11 @@ private:
       VertexLayoutComponent::Position,
       VertexLayoutComponent::Normal,
   }};
-  Model model;
+
+  struct {
+    Model spot;
+  } models;
+
   struct {
     Buffer object{};
     Buffer params{};

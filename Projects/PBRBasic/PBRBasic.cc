@@ -32,7 +32,7 @@ void PBRBasic::OnPostInit() {
 }
 
 void PBRBasic::OnPreDestroy() {
-  model.Destroy(device);
+  models.spot.Destroy(device);
 
   uniformBuffers.params.Destroy(device);
   uniformBuffers.object.Destroy(device);
@@ -97,17 +97,22 @@ void PBRBasic::BuildCommandBuffers() {
 
     // 三角形の頂点バッファとインデックスバッファをバインドします。
     VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &model.vertices.buffer,
-                           offsets);
-    vkCmdBindIndexBuffer(drawCmdBuffers[i], model.indices.buffer, 0,
+    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                           &models.spot.vertices.buffer, offsets);
+    vkCmdBindIndexBuffer(drawCmdBuffers[i], models.spot.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
 
     // Spot左側
     {
-      const glm::vec3 pos = glm::vec3(-1.0f, 0.0f, 0.0);
+      glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
+                                    glm::vec3(0.0f, 1.0f, 0.0f));
+      const auto trans =
+          glm::vec3(config["Spot"]["Positions"][0][0].get<float>(),
+                    config["Spot"]["Positions"][0][1].get<float>(),
+                    config["Spot"]["Positions"][0][2].get<float>());
+      model = glm::translate(model, trans);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
-                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3),
-                         &pos);
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
       mat.rough = settings.metalRough;
       mat.metal = 1.0f;
@@ -116,16 +121,21 @@ void PBRBasic::BuildCommandBuffers() {
       mat.g = settings.metalSpecular.g;
       mat.b = settings.metalSpecular.b;
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
-                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::vec3),
+                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(model),
                          sizeof(mat), &mat);
-      vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
+      vkCmdDrawIndexed(drawCmdBuffers[i], models.spot.indexCount, 1, 0, 0, 0);
     }
     // Spot右側
     {
-      const glm::vec3 pos = glm::vec3(1.0f, 0.0f, 0.0);
+      glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
+                                    glm::vec3(0.0f, 1.0f, 0.0f));
+      const auto trans =
+          glm::vec3(config["Spot"]["Positions"][1][0].get<float>(),
+                    config["Spot"]["Positions"][1][1].get<float>(),
+                    config["Spot"]["Positions"][1][2].get<float>());
+      model = glm::translate(model, trans);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
-                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3),
-                         &pos);
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
       mat.rough = settings.dielectricRough;
       mat.metal = 0.0f;
@@ -134,9 +144,9 @@ void PBRBasic::BuildCommandBuffers() {
       mat.g = settings.dielectricBaseColor.g;
       mat.b = settings.dielectricBaseColor.b;
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
-                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::vec3),
+                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(model),
                          sizeof(mat), &mat);
-      vkCmdDrawIndexed(drawCmdBuffers[i], model.indexCount, 1, 0, 0, 0);
+      vkCmdDrawIndexed(drawCmdBuffers[i], models.spot.indexCount, 1, 0, 0, 0);
     }
 
     DrawUI(drawCmdBuffers[i]);
@@ -152,20 +162,21 @@ void PBRBasic::OnUpdate(float t) {
   const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
   prevTime = t;
 
-  lightAngle = glm::mod(lightAngle + deltaT, glm::two_pi<float>());
-  UpdateLights();
+  const auto LIGHT_ROTATE_SPEED = config["LightRotationSpeed"].get<float>();
+  lightAngle = glm::mod(lightAngle + LIGHT_ROTATE_SPEED * deltaT, glm::two_pi<float>());
+  UpdateUniformBufferFS();
 }
 
-void PBRBasic::ViewChanged() { UpdateUniformBuffers(); }
+void PBRBasic::ViewChanged() { UpdateUniformBufferVS(); }
 
 //*-----------------------------------------------------------------------------
 // Assets
 //*-----------------------------------------------------------------------------
 
 void PBRBasic::LoadAssets() {
-  const auto &modelPath = config["Model"].get<std::string>();
+  const auto &modelPath = config["Spot"]["Model"].get<std::string>();
   const auto result =
-      model.LoadFromFile(device, modelPath, queue, vertexLayout);
+      models.spot.LoadFromFile(device, modelPath, queue, vertexLayout);
   BOOST_ASSERT_MSG(result, "Failed to load model!");
 }
 
@@ -198,9 +209,9 @@ void PBRBasic::SetupDescriptorSetLayout() {
 
   std::vector<VkPushConstantRange> pushConstantRanges = {
       Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT,
-                                     sizeof(glm::vec3), 0),
+                                     sizeof(glm::mat4), 0),
       Initializer::PushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT,
-                                     sizeof(Material), sizeof(glm::vec3)),
+                                     sizeof(Material), sizeof(glm::mat4)),
   };
   pipelineLayoutCreateInfo.pushConstantRangeCount =
       static_cast<uint32_t>(pushConstantRanges.size());
@@ -361,8 +372,13 @@ void PBRBasic::SetupPipelines() {
 //*-----------------------------------------------------------------------------
 
 void PBRBasic::PrepareCamera() {
-  camera.SetupOrient(glm::vec3(0.0f, 1.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f),
-                     glm::vec3(0.0f, 1.0f, 0.0f));
+  const auto camPt = glm::vec3(config["Camera"]["Position"][0].get<float>(),
+                               config["Camera"]["Position"][1].get<float>(),
+                               config["Camera"]["Position"][2].get<float>());
+  const auto targetPt = glm::vec3(config["Camera"]["Target"][0].get<float>(),
+                                  config["Camera"]["Target"][1].get<float>(),
+                                  config["Camera"]["Target"][2].get<float>());
+  camera.SetupOrient(camPt, targetPt, glm::vec3(0.0f, 1.0f, 0.0f));
   camera.SetupPerspective(glm::radians(60.0f),
                           static_cast<float>(swapchain.extent.width) /
                               static_cast<float>(swapchain.extent.height),
@@ -380,53 +396,64 @@ void PBRBasic::PrepareUniformBuffers() {
       uniformBuffers.object.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                   &ubo, sizeof(ubo)));
+                                   &uboVS, sizeof(uboVS)));
   VK_CHECK_RESULT(uniformBuffers.object.Map(device));
 
   VK_CHECK_RESULT(
       uniformBuffers.params.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                   &uboParams, sizeof(uboParams)));
+                                   &uboFS, sizeof(uboFS)));
   VK_CHECK_RESULT(uniformBuffers.params.Map(device));
 
-  UpdateUniformBuffers();
-  UpdateLights();
+  UpdateUniformBufferVS();
+  UpdateUniformBufferFS();
 }
 
 //*-----------------------------------------------------------------------------
 // Update
 //*-----------------------------------------------------------------------------
 
-void PBRBasic::UpdateUniformBuffers() {
+void PBRBasic::UpdateUniformBufferVS() {
   // 行列をシェーダーに渡します。
-  ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
-                          glm::vec3(0.0f, 1.0f, 0.0f));
-  ubo.view = camera.GetViewMatrix();
-  ubo.proj = camera.GetProjectionMatrix();
+  const auto view = camera.GetViewMatrix();
+  const auto proj = camera.GetProjectionMatrix();
+  uboVS.viewProj = proj * view;
 
   // ユニフォームバッファへコピーします。
-  uniformBuffers.object.Copy(&ubo, sizeof(ubo));
+  uniformBuffers.object.Copy(&uboVS, sizeof(uboVS));
 }
 
-void PBRBasic::UpdateLights() {
-  uboParams.eye = -1.0f * camera.GetPosition();
-  uboParams.lights[0].pos = glm::vec4(3.0f * std::cos(lightAngle), 0.0f,
-                                      3.0f * std::sin(lightAngle), 1.0f);
-  uboParams.lights[0].intensity = 25.0f;
-  uboParams.lights[1].pos = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-  uboParams.lights[1].intensity = 5.0f;
-  uboParams.lights[2].pos = glm::vec4(0.0f, 0.0f, -3.0f, 1.0f);
-  uboParams.lights[2].intensity = 25.0f;
+void PBRBasic::UpdateUniformBufferFS() {
+  uboFS.eye = camera.GetPosition();
 
-  uboParams.lightsNum = 3;
+  uboFS.lightsNum = static_cast<int>(config["Lights"].size());
+  for (int i = 0; i < uboFS.lightsNum; i++) {
+    const auto &light = config["Lights"][i];
 
-  uniformBuffers.params.Copy(&uboParams, sizeof(uboParams));
+    uboFS.lights[i].intensity = light["Intensity"].get<float>();
+    if (light.contains("Position")) {
+      for (int j = 0; j < 4; j++) {
+        uboFS.lights[i].pos[j] = light["Position"][j].get<float>();
+      }
+    } else {
+      const auto radius = light["Radius"].get<float>();
+      uboFS.lights[i].pos.x = radius * std::sin(lightAngle);
+      uboFS.lights[i].pos.y = light["Height"].get<float>();
+      uboFS.lights[i].pos.z = radius * std::cos(lightAngle);
+      uboFS.lights[i].pos.w =
+          light["Type"].get<std::string>() == "Directional" ? 0.0f : 1.0f;
+    }
+  }
+
+  uniformBuffers.params.Copy(&uboFS, sizeof(uboFS));
 }
 
 void PBRBasic::OnUpdateUIOverlay() {
   uiOverlay.ColorEdit3("Metal Specular", &settings.metalSpecular);
   uiOverlay.SliderFloat("Metal Roughness", &settings.metalRough, 0.0f, 1.0f);
-  uiOverlay.ColorEdit3("Non-Metal Diffuse Albedo", &settings.dielectricBaseColor);
-  uiOverlay.SliderFloat("Non-Metal Roughness", &settings.dielectricRough, 0.0f, 1.0f);
+  uiOverlay.ColorEdit3("Non-Metal Diffuse Albedo",
+                       &settings.dielectricBaseColor);
+  uiOverlay.SliderFloat("Non-Metal Roughness", &settings.dielectricRough, 0.0f,
+                        1.0f);
 }

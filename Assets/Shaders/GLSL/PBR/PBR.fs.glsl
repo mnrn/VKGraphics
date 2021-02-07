@@ -21,12 +21,12 @@ layout (binding=1) uniform UniformBufferObjectShared {
 } UBOParams;
 
 layout (push_constant) uniform PushConstants {
-    layout (offset=12) float Roughness;
-    layout (offset=16) float Metallic;
-    layout (offset=20) float Reflectance;
-    layout (offset=24) float R;
-    layout (offset=28) float G;
-    layout (offset=32) float B;
+    layout (offset=64) float Roughness;
+    layout (offset=68) float Metallic;
+    layout (offset=72) float Reflectance;
+    layout (offset=76) float R;
+    layout (offset=80) float G;
+    layout (offset=84) float B;
 } Material;
 
 /**
