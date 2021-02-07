@@ -107,7 +107,6 @@ void Deferred::LoadAssets() {
   // Teapot
   {
     const auto &teapot = config["Teapot"];
-    modelCreateInfo.scale = glm::vec3(teapot["Scale"].get<float>());
     modelCreateInfo.color = glm::vec3(teapot["Color"][0].get<float>(),
                                       teapot["Color"][1].get<float>(),
                                       teapot["Color"][2].get<float>());
@@ -118,10 +117,6 @@ void Deferred::LoadAssets() {
   // Torus
   {
     const auto &torus = config["Torus"];
-    modelCreateInfo.scale = glm::vec3(torus["Scale"].get<float>());
-    modelCreateInfo.center = glm::vec3(torus["Position"][0].get<float>(),
-                                       torus["Position"][1].get<float>(),
-                                       torus["Position"][2].get<float>());
     modelCreateInfo.color = glm::vec3(torus["Color"][0].get<float>(),
                                       torus["Color"][1].get<float>(),
                                       torus["Color"][2].get<float>());
@@ -132,10 +127,6 @@ void Deferred::LoadAssets() {
   // Floor
   {
     const auto &floor = config["Floor"];
-    modelCreateInfo.scale = glm::vec3(floor["Scale"].get<float>());
-    modelCreateInfo.center = glm::vec3(floor["Position"][0].get<float>(),
-                                       floor["Position"][1].get<float>(),
-                                       floor["Position"][2].get<float>());
     modelCreateInfo.color = glm::vec3(floor["Color"][0].get<float>(),
                                       floor["Color"][1].get<float>(),
                                       floor["Color"][2].get<float>());
@@ -179,6 +170,13 @@ void Deferred::SetupDescriptorSetLayout() {
   // すべてのパイプラインで使用されるようにパイプラインレイアウトを共有します。
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
       Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
+  std::vector<VkPushConstantRange> pushConstantRanges = {
+      Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT,
+                                     sizeof(glm::mat4), 0),
+  };
+  pipelineLayoutCreateInfo.pushConstantRangeCount =
+      static_cast<uint32_t>(pushConstantRanges.size());
+  pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
   VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
                                          nullptr, &pipelineLayout));
 }
@@ -399,7 +397,8 @@ void Deferred::PrepareOffscreenFramebuffer() {
   attachmentCreateInfo.width = offscreenFramebuffer.width;
   attachmentCreateInfo.height = offscreenFramebuffer.height;
   attachmentCreateInfo.layerCount = 1;
-  attachmentCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  attachmentCreateInfo.usage =
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
   attachmentCreateInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
   // POSITION (World Space)
@@ -568,7 +567,6 @@ void Deferred::BuildDeferredCommandBuffer() {
 
   // Teapot
   {
-    // Instanced Models
     vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
                             nullptr);
@@ -576,9 +574,13 @@ void Deferred::BuildDeferredCommandBuffer() {
                            &models.teapot.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(offscreenCmdBuffer, models.teapot.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(offscreenCmdBuffer, models.teapot.indexCount, 3, 0, 0, 0);
+    const auto &teapot = config["Teapot"];
+    const auto scale = glm::vec3(teapot["Scale"].get<float>());
+    const auto model = glm::scale(glm::mat4(1.0f), scale);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
+    vkCmdDrawIndexed(offscreenCmdBuffer, models.teapot.indexCount, 1, 0, 0, 0);
   }
-
   // Torus
   {
     vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -588,6 +590,20 @@ void Deferred::BuildDeferredCommandBuffer() {
                            &models.torus.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(offscreenCmdBuffer, models.torus.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
+    const auto &torus = config["Torus"];
+    const auto scale = glm::vec3(torus["Scale"].get<float>());
+    const auto rotAxis = glm::vec3(torus["Rotate"]["Axis"][0].get<float>(),
+                                   torus["Rotate"]["Axis"][1].get<float>(),
+                                   torus["Rotate"]["Axis"][2].get<float>());
+    const auto angle = glm::radians(torus["Rotate"]["Degrees"].get<float>());
+    const auto trans = glm::vec3(torus["Position"][0].get<float>(),
+                                 torus["Position"][1].get<float>(),
+                                 torus["Position"][2].get<float>());
+    auto model = glm::translate(glm::mat4(1.0f), trans);
+    model = glm::rotate(model, angle, rotAxis);
+    model = glm::scale(model, scale);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
     vkCmdDrawIndexed(offscreenCmdBuffer, models.torus.indexCount, 1, 0, 0, 0);
   }
 
@@ -600,9 +616,17 @@ void Deferred::BuildDeferredCommandBuffer() {
                            &models.floor.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
+    const auto &floor = config["Floor"];
+    const auto scale = glm::vec3(floor["Scale"].get<float>());
+    const auto trans = glm::vec3(floor["Position"][0].get<float>(),
+                                 floor["Position"][1].get<float>(),
+                                 floor["Position"][2].get<float>());
+    auto model = glm::translate(glm::mat4(1.0f), trans);
+    model = glm::scale(model, scale);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
     vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
   }
-
   vkCmdEndRenderPass(offscreenCmdBuffer);
   VK_CHECK_RESULT(vkEndCommandBuffer(offscreenCmdBuffer));
 }
@@ -626,9 +650,9 @@ void Deferred::UpdateUniformBuffers() {
 
 void Deferred::UpdateOffscreenUniformBuffers() {
   // 行列をシェーダーに渡します。
-  uboOffscreenVS.model = glm::mat4(1.0f);
-  uboOffscreenVS.view = camera.GetViewMatrix();
-  uboOffscreenVS.proj = camera.GetProjectionMatrix();
+  const auto view = camera.GetViewMatrix();
+  const auto proj = camera.GetProjectionMatrix();
+  uboOffscreenVS.viewProj = proj * view;
 
   // ユニフォームバッファへコピーします。
   uniformBuffers.offscreen.Copy(&uboOffscreenVS, sizeof(uboOffscreenVS));
