@@ -7,22 +7,31 @@
     "UIOverlay": true,
     "Pipelines": {
         "Offscreen": {
-            "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredOffscreen.vs.spv",
-            "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredOffscreen.fs.spv"
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredOffscreen.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredOffscreen.fs.spv"
         },
         "Composition": {
-            "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredVisualize.vs.spv",
-            "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredVisualize.fs.spv"
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredVisualize.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredVisualize.fs.spv"
         }
     },
     "Teapot": {
-        "Model": "./Assets/Models/dae/Teapot/teapot.dae"
+        "Model": "./Assets/Models/dae/Teapot/teapot.dae",
+        "Scale": 0.5,
+        "Color": [0.9, 0.9, 0.9],
+        "Position": [0.0, 0.0, 0.0]
     },
     "Torus": {
-        "Model": "./Assets/Models/dae/Primitives/torus.dae"
+        "Model": "./Assets/Models/dae/Primitives/torus.dae",
+        "Scale": 1.0,
+        "Color": [1.0, 0.71, 0.29],
+        "Position": [3.0, 0.0, 0.0]
     },
     "Floor": {
-        "Model": "./Assets/Models/dae/Primitives/plane.dae"
+        "Model": "./Assets/Models/dae/Primitives/plane.dae",
+        "Scale": 50.0,
+        "Color": [0.4, 0.4, 0.4],
+        "Position": [0.0, -0.75, 0.0]
     },
     "Camera": {
         "Radius": 5.0,

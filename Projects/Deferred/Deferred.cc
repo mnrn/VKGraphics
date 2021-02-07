@@ -106,26 +106,39 @@ void Deferred::LoadAssets() {
   ModelCreateInfo modelCreateInfo{};
   // Teapot
   {
-    modelCreateInfo.scale = glm::vec3(0.5f);
-    modelCreateInfo.color = glm::vec3(0.9f);
+    const auto &teapot = config["Teapot"];
+    modelCreateInfo.scale = glm::vec3(teapot["Scale"].get<float>());
+    modelCreateInfo.color = glm::vec3(teapot["Color"][0].get<float>(),
+                                      teapot["Color"][1].get<float>(),
+                                      teapot["Color"][2].get<float>());
     models.teapot.LoadFromFile(device,
                                config["Teapot"]["Model"].get<std::string>(),
                                queue, vertexLayout, modelCreateInfo);
   }
   // Torus
   {
-    modelCreateInfo.scale = glm::vec3(1.0f);
-    modelCreateInfo.center = glm::vec3(3.0f, 0.0f, 0.0f);
-    modelCreateInfo.color = glm::vec3(1.0f, 0.71f, 0.29f);
+    const auto &torus = config["Torus"];
+    modelCreateInfo.scale = glm::vec3(torus["Scale"].get<float>());
+    modelCreateInfo.center = glm::vec3(torus["Position"][0].get<float>(),
+                                       torus["Position"][1].get<float>(),
+                                       torus["Position"][2].get<float>());
+    modelCreateInfo.color = glm::vec3(torus["Color"][0].get<float>(),
+                                      torus["Color"][1].get<float>(),
+                                      torus["Color"][2].get<float>());
     models.torus.LoadFromFile(device,
                               config["Torus"]["Model"].get<std::string>(),
                               queue, vertexLayout, modelCreateInfo);
   }
   // Floor
   {
-    modelCreateInfo.center = glm::vec3(0.0f, -0.75f, 0.0f);
-    modelCreateInfo.scale = glm::vec3(50.0f);
-    modelCreateInfo.color = glm::vec3(0.4f);
+    const auto &floor = config["Floor"];
+    modelCreateInfo.scale = glm::vec3(floor["Scale"].get<float>());
+    modelCreateInfo.center = glm::vec3(floor["Position"][0].get<float>(),
+                                       floor["Position"][1].get<float>(),
+                                       floor["Position"][2].get<float>());
+    modelCreateInfo.color = glm::vec3(floor["Color"][0].get<float>(),
+                                      floor["Color"][1].get<float>(),
+                                      floor["Color"][2].get<float>());
     models.floor.LoadFromFile(device,
                               config["Floor"]["Model"].get<std::string>(),
                               queue, vertexLayout, modelCreateInfo);
