@@ -52,9 +52,14 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
     vertexCount += mesh->mNumVertices;
 
     aiColor3D color(0.0f, 0.0f, 0.0f);
-    scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_COLOR_DIFFUSE,
-                                                 color);
-
+    if (modelCreateInfo.color.has_value()) {
+      color.r = modelCreateInfo.color->r;
+      color.g = modelCreateInfo.color->g;
+      color.b = modelCreateInfo.color->b;
+    } else {
+      scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_COLOR_DIFFUSE,
+                                                   color);
+    }
     const aiVector3D zero3D(0.0f, 0.0f, 0.0f);
     for (uint32_t j = 0; j < mesh->mNumVertices; j++) {
 
