@@ -23,9 +23,13 @@
     },
     "Torus": {
         "Model": "./Assets/Models/dae/Primitives/torus.dae",
-        "Scale": 1.0,
+        "Scale": 0.75,
         "Color": [1.0, 0.71, 0.29],
-        "Position": [3.0, 0.0, 0.0]
+        "Position": [2.5, 0.5, 0.0],
+        "Rotate": {
+            "Degrees": 30.0,
+            "Axis": [1.0, 0.0, 0.0]
+        }
     },
     "Floor": {
         "Model": "./Assets/Models/dae/Primitives/plane.dae",
