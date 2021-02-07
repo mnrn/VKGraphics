@@ -104,13 +104,11 @@ void PBRBasic::BuildCommandBuffers() {
                          VK_INDEX_TYPE_UINT32);
     // Spot左側
     {
-      glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
-                                    glm::vec3(0.0f, 1.0f, 0.0f));
       const auto trans =
           glm::vec3(config["Spot"]["Positions"][0][0].get<float>(),
                     config["Spot"]["Positions"][0][1].get<float>(),
                     config["Spot"]["Positions"][0][2].get<float>());
-      model = glm::translate(model, trans);
+      const auto model = glm::translate(glm::mat4(1.0f), trans);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
@@ -127,13 +125,11 @@ void PBRBasic::BuildCommandBuffers() {
     }
     // Spot右側
     {
-      glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
-                                    glm::vec3(0.0f, 1.0f, 0.0f));
       const auto trans =
           glm::vec3(config["Spot"]["Positions"][1][0].get<float>(),
                     config["Spot"]["Positions"][1][1].get<float>(),
                     config["Spot"]["Positions"][1][2].get<float>());
-      model = glm::translate(model, trans);
+      const auto model = glm::translate(glm::mat4(1.0f), trans);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
@@ -196,7 +192,10 @@ void PBRBasic::OnUpdate(float t) {
   UpdateUniformBufferFS();
 }
 
-void PBRBasic::ViewChanged() { UpdateUniformBufferVS(); }
+void PBRBasic::ViewChanged() {
+  PrepareCamera();
+  UpdateUniformBufferVS();
+}
 
 //*-----------------------------------------------------------------------------
 // Assets
