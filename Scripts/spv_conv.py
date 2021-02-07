@@ -68,5 +68,5 @@ class Compiler(object):
 if __name__ == '__main__':
     compiler = Compiler()
 
-    #compiler.compiles('GLSL')
+    compiler.compiles('GLSL')
     compiler.compiles('HLSL')

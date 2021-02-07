@@ -15,6 +15,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <optional>
 
 #include "VK/Buffer.h"
 #include "VK/Device.h"
@@ -34,7 +35,8 @@ enum struct VertexLayoutComponent {
  *  モデルのロードと頂点入力および属性バインディング用の頂点レイアウトコンポーネントを格納します。
  */
 struct VertexLayout {
-  explicit VertexLayout(std::vector<VertexLayoutComponent> &&vertexLayoutComponents)
+  explicit VertexLayout(
+      std::vector<VertexLayoutComponent> &&vertexLayoutComponents)
       : components(std::move(vertexLayoutComponents)) {}
 
   [[nodiscard]] uint32_t Stride() const {
@@ -61,15 +63,14 @@ struct ModelCreateInfo {
   glm::vec3 center = glm::vec3(0.0f);
   glm::vec3 scale = glm::vec3(1.0f);
   glm::vec2 uvscale = glm::vec2(1.0f);
+  std::optional<glm::vec3> color = std::nullopt;
   VkMemoryPropertyFlags memoryPropertyFlags = 0;
 };
 
 struct Model {
-  bool LoadFromFile(const Device &device,
-                                  const std::string &filepath,
-                                  VkQueue copyQueue,
-                                  const VertexLayout &vertexLayout,
-                                  const ModelCreateInfo &modelCreateInfo = {});
+  bool LoadFromFile(const Device &device, const std::string &filepath,
+                    VkQueue copyQueue, const VertexLayout &vertexLayout,
+                    const ModelCreateInfo &modelCreateInfo = {});
   void Destroy(const Device &device) const;
 
   Buffer vertices{};

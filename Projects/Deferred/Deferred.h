@@ -19,11 +19,11 @@ public:
   void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
-  void PrepareCamera();
   void LoadAssets();
   void PrepareOffscreenFramebuffer();
   void PrepareUniformBuffers();
 
+  void UpdateUniformBuffers();
   void UpdateOffscreenUniformBuffers();
   void UpdateCompositionUniformBuffers();
 
@@ -39,29 +39,17 @@ public:
   void ViewChanged() override;
 
 private:
-  struct {
-    struct {
-      Texture2D colorMap;
-      Texture2D normalMap;
-    } model;
-    struct {
-      Texture2D colorMap;
-      Texture2D normalMap;
-    } floor;
-  } textures;
-
   VertexLayout vertexLayout{
       {
           VertexLayoutComponent::Position,
-          VertexLayoutComponent::UV,
           VertexLayoutComponent::Color,
           VertexLayoutComponent::Normal,
-          VertexLayoutComponent::Tangent,
       },
   };
 
   struct {
-    Model model;
+    Model teapot;
+    Model torus;
     Model floor;
   } models;
 
@@ -96,10 +84,9 @@ private:
   VkPipelineLayout pipelineLayout;
 
   struct {
-    VkDescriptorSet model;
-    VkDescriptorSet floor;
+    VkDescriptorSet offscreen;
+    VkDescriptorSet composition;
   } descriptorSets;
-  VkDescriptorSet descriptorSet;
   VkDescriptorSetLayout descriptorSetLayout;
 
   Framebuffer offscreenFramebuffer;
@@ -110,6 +97,7 @@ private:
   Camera camera{};
 
   float prevTime = 0.0f;
+  float camAngle = 0.0f;
 
   struct Settings {
     int dispRenderTarget = 0;
