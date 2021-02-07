@@ -32,11 +32,7 @@
     ],
     "Spot": {
         "Model" : "./Assets/Models/dae/Spot/spot_triangulated.dae",
-        "Positions": [[-1, 0, 0], [1, 0, 0]],
-        "Rotate": {
-            "Axis": [0, 1, 0],
-            "Degree": 180
-        }
+        "Positions": [[-1, 0, 0], [1, 0, 0]]
     },
     "Floor": {
         "Model": "./Assets/Models/dae/Primitives/plane.dae",

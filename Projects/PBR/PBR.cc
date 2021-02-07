@@ -108,13 +108,7 @@ void PBR::BuildCommandBuffers() {
       const auto trans = glm::vec3(spot["Positions"][0][0].get<float>(),
                                    spot["Positions"][0][1].get<float>(),
                                    spot["Positions"][0][2].get<float>());
-      const auto rotAxis = glm::vec3(spot["Rotate"]["Axis"][0].get<float>(),
-                                     spot["Rotate"]["Axis"][1].get<float>(),
-                                     spot["Rotate"]["Axis"][2].get<float>());
-      const auto rotRadians =
-          glm::radians(spot["Rotate"]["Degree"].get<float>());
-      auto model = glm::translate(glm::mat4(1.0f), trans);
-      model = glm::rotate(model, rotRadians, rotAxis);
+      const auto model = glm::translate(glm::mat4(1.0f), trans);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
@@ -135,13 +129,7 @@ void PBR::BuildCommandBuffers() {
       const auto trans = glm::vec3(spot["Positions"][1][0].get<float>(),
                                    spot["Positions"][1][1].get<float>(),
                                    spot["Positions"][1][2].get<float>());
-      const auto rotAxis = glm::vec3(spot["Rotate"]["Axis"][0].get<float>(),
-                                     spot["Rotate"]["Axis"][1].get<float>(),
-                                     spot["Rotate"]["Axis"][2].get<float>());
-      const auto rotRadians =
-          glm::radians(spot["Rotate"]["Degree"].get<float>());
-      auto model = glm::translate(glm::mat4(1.0f), trans);
-      model = glm::rotate(model, rotRadians, rotAxis);
+      const auto model = glm::translate(glm::mat4(1.0f), trans);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
