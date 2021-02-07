@@ -11,8 +11,8 @@
             "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredOffscreen.fs.spv"
         },
         "Composition": {
-            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredVisualize.vs.spv",
-            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Deferred/DeferredVisualize.fs.spv"
+            "VertexShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredVisualize.vs.spv",
+            "FragmentShader": "./Assets/Shaders/HLSL/SPIR-V/Deferred/DeferredVisualize.fs.spv"
         }
     },
     "Teapot": {
@@ -39,7 +39,7 @@
     },
     "Camera": {
         "Radius": 5.0,
-        "RotationSpeed": 1.0
+        "RotationSpeed": 0.2
     },
     "Lights": [
         {

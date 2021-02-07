@@ -60,11 +60,11 @@ float V_SmithGGX(float NoV, float NoL, float roughness) {
  * @brief The Schlick approximation for the Fresnel term(フレネル項のSchlick近似)
  */
 float3 F_Schlick(float u, float3 f0) {
-    return f0 + (float3(1.0) - f0) * pow(1.0 - u, 5.0);
+    return f0 + (float3(1.0, 1.0, 1.0) - f0) * pow(1.0 - u, 5.0);
 }
 
 float3 GammaCorrection(float3 color) {
-    return pow(color, float3(1.0 / GAMMA));
+    return pow(color, float3(1.0 / GAMMA, 1.0 / GAMMA, 1.0 / GAMMA));
 }
 
 float3 MicroFacetModel(int lightIdx, float3 pos, float3 n) {
@@ -75,7 +75,7 @@ float3 MicroFacetModel(int lightIdx, float3 pos, float3 n) {
     float3 f0 = 0.16 * material.Reflectance * material.Reflectance * (1.0 - material.Metallic) + MaterialBaseColor() * material.Metallic;
 
     // ライトに関して。
-    float3 l = float3(0.0);
+    float3 l = float3(0.0, 0.0, 0.0);
     float lightIntensity = uboParams.Lights[lightIdx].Intensity;
     if (uboParams.Lights[lightIdx].Position.w == 0.0) {    // Directional Lightの場合
         l = normalize(uboParams.Lights[lightIdx].Position.xyz);
@@ -106,7 +106,7 @@ float3 MicroFacetModel(int lightIdx, float3 pos, float3 n) {
 }
 
 float4 main(VSOutput input) : SV_TARGET {
-    float3 color = float3(0.0);
+    float3 color = float3(0.0, 0.0, 0.0);
     float3 n = normalize(input.Normal);
 
     for (int i = 0; i < uboParams.LightsNum; i++) {

@@ -17,9 +17,9 @@ layout (push_constant) uniform PushConstants {
 } pushConsts;
 
 void main () {
-    gl_Position = ubo.ViewProj * pushConsts.Model * vec4(VertexPosition, 1.0);
-
     WorldPos = vec3(pushConsts.Model * vec4(VertexPosition, 1.0));
     Color = VertexColor;
     Normal = mat3(pushConsts.Model) * VertexNormal;
+    
+    gl_Position = ubo.ViewProj * vec4(WorldPos, 1.0);
 }
