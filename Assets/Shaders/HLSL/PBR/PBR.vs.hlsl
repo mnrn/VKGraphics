@@ -22,7 +22,9 @@ struct VSOutput {
 struct PushConstants {
     float3 ObjPos;
 };
-[[vk::push_constant]] PushConstants pushConsts;
+
+[[vk::push_constant]] 
+PushConstants pushConsts;
 
 VSOutput main(VSInput input) {
     VSOutput output = (VSOutput)0;

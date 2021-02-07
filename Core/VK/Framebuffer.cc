@@ -74,6 +74,10 @@ Framebuffer::AddAttachment(const Device &device,
   framebufferAttachment.description.samples =
       attachmentCreateInfo.imageSampleCount;
   framebufferAttachment.description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  framebufferAttachment.description.storeOp =
+      (attachmentCreateInfo.usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+          ? VK_ATTACHMENT_STORE_OP_STORE
+          : VK_ATTACHMENT_STORE_OP_DONT_CARE;
   framebufferAttachment.description.stencilLoadOp =
       VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   framebufferAttachment.description.stencilStoreOp =
