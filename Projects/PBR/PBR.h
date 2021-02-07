@@ -24,7 +24,7 @@ enum struct MetalColor : std::uint32_t {
   Platinum,
 };
 
-class PBRBasic : public VkBase {
+class PBR : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;

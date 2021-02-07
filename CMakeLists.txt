@@ -86,7 +86,7 @@ set(TARGETS
     #MinimalVK
     HelloTriangle
     TextureMapping
-    PBRBasic
+    PBR
     Deferred
     )
 buildAll()

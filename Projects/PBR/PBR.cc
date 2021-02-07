@@ -1,4 +1,4 @@
-#include "PBRBasic.h"
+#include "PBR.h"
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -15,7 +15,7 @@
 // Overrides functions
 //*-----------------------------------------------------------------------------
 
-void PBRBasic::OnPostInit() {
+void PBR::OnPostInit() {
   VkBase::OnPostInit();
 
   PrepareCamera();
@@ -31,7 +31,7 @@ void PBRBasic::OnPostInit() {
   BuildCommandBuffers();
 }
 
-void PBRBasic::OnPreDestroy() {
+void PBR::OnPreDestroy() {
   models.floor.Destroy(device);
   models.spot.Destroy(device);
 
@@ -50,7 +50,7 @@ void PBRBasic::OnPreDestroy() {
  * OpenGLとは異なり、すべてのレンダリングコマンドはコマンドバッファに一度記録され、その後キューに再送信されます。<br>
  * これにより、Vulkanの最大の利点の１つである、複数のスレッドから事前に作業を生成できます。
  */
-void PBRBasic::BuildCommandBuffers() {
+void PBR::BuildCommandBuffers() {
   VkCommandBufferBeginInfo commandBufferBeginInfo =
       Initializer::CommandBufferBeginInfo();
 
@@ -104,11 +104,17 @@ void PBRBasic::BuildCommandBuffers() {
                          VK_INDEX_TYPE_UINT32);
     // Spot左側
     {
-      const auto trans =
-          glm::vec3(config["Spot"]["Positions"][0][0].get<float>(),
-                    config["Spot"]["Positions"][0][1].get<float>(),
-                    config["Spot"]["Positions"][0][2].get<float>());
-      const auto model = glm::translate(glm::mat4(1.0f), trans);
+      const auto &spot = config["Spot"];
+      const auto trans = glm::vec3(spot["Positions"][0][0].get<float>(),
+                                   spot["Positions"][0][1].get<float>(),
+                                   spot["Positions"][0][2].get<float>());
+      const auto rotAxis = glm::vec3(spot["Rotate"]["Axis"][0].get<float>(),
+                                     spot["Rotate"]["Axis"][1].get<float>(),
+                                     spot["Rotate"]["Axis"][2].get<float>());
+      const auto rotRadians =
+          glm::radians(spot["Rotate"]["Degree"].get<float>());
+      auto model = glm::translate(glm::mat4(1.0f), trans);
+      model = glm::rotate(model, rotRadians, rotAxis);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
@@ -125,11 +131,17 @@ void PBRBasic::BuildCommandBuffers() {
     }
     // Spot右側
     {
-      const auto trans =
-          glm::vec3(config["Spot"]["Positions"][1][0].get<float>(),
-                    config["Spot"]["Positions"][1][1].get<float>(),
-                    config["Spot"]["Positions"][1][2].get<float>());
-      const auto model = glm::translate(glm::mat4(1.0f), trans);
+      const auto &spot = config["Spot"];
+      const auto trans = glm::vec3(spot["Positions"][1][0].get<float>(),
+                                   spot["Positions"][1][1].get<float>(),
+                                   spot["Positions"][1][2].get<float>());
+      const auto rotAxis = glm::vec3(spot["Rotate"]["Axis"][0].get<float>(),
+                                     spot["Rotate"]["Axis"][1].get<float>(),
+                                     spot["Rotate"]["Axis"][2].get<float>());
+      const auto rotRadians =
+          glm::radians(spot["Rotate"]["Degree"].get<float>());
+      auto model = glm::translate(glm::mat4(1.0f), trans);
+      model = glm::rotate(model, rotRadians, rotAxis);
       vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
                          VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
       Material mat{};
@@ -182,7 +194,7 @@ void PBRBasic::BuildCommandBuffers() {
   }
 }
 
-void PBRBasic::OnUpdate(float t) {
+void PBR::OnUpdate(float t) {
   const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
   prevTime = t;
 
@@ -192,7 +204,7 @@ void PBRBasic::OnUpdate(float t) {
   UpdateUniformBufferFS();
 }
 
-void PBRBasic::ViewChanged() {
+void PBR::ViewChanged() {
   PrepareCamera();
   UpdateUniformBufferVS();
 }
@@ -201,7 +213,7 @@ void PBRBasic::ViewChanged() {
 // Assets
 //*-----------------------------------------------------------------------------
 
-void PBRBasic::LoadAssets() {
+void PBR::LoadAssets() {
   // Spot
   {
     const auto &modelPath = config["Spot"]["Model"].get<std::string>();
@@ -227,7 +239,7 @@ void PBRBasic::LoadAssets() {
  * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
  * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
  */
-void PBRBasic::SetupDescriptorSetLayout() {
+void PBR::SetupDescriptorSetLayout() {
   std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
       Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                               VK_SHADER_STAGE_VERTEX_BIT, 0),
@@ -258,7 +270,7 @@ void PBRBasic::SetupDescriptorSetLayout() {
                                          nullptr, &pipelineLayout));
 }
 
-void PBRBasic::SetupDescriptorPool() {
+void PBR::SetupDescriptorPool() {
   // APIに記述子の最大数を通知する必要があります。
   std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
       Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16),
@@ -272,7 +284,7 @@ void PBRBasic::SetupDescriptorPool() {
                                          &descriptorPool));
 }
 
-void PBRBasic::SetupDescriptorSet() {
+void PBR::SetupDescriptorSet() {
   // グローバル記述子プールから新しい記述子セットを割り当てます。
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo =
       Initializer::DescriptorSetAllocateInfo(descriptorPool,
@@ -298,7 +310,7 @@ void PBRBasic::SetupDescriptorSet() {
  * Vulkanは、レンダリングパイプラインの概念を用いてFixedStatusをカプセル化し、OpenGLの複雑なステートマシンを置き換えます。<br>
  * パイプラインはGPUに保存およびハッシュされ、パイプラインの変更が非常に高速になります。
  */
-void PBRBasic::SetupPipelines() {
+void PBR::SetupPipelines() {
   // 入力アセンブリステートはプリミティブがどのようにアセンブルされるかを記述します。
   // このパイプラインでは、頂点データを三角形リストとしてアセンブルします。
   VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
@@ -409,7 +421,7 @@ void PBRBasic::SetupPipelines() {
 // Prepare
 //*-----------------------------------------------------------------------------
 
-void PBRBasic::PrepareCamera() {
+void PBR::PrepareCamera() {
   const auto camPt = glm::vec3(config["Camera"]["Position"][0].get<float>(),
                                config["Camera"]["Position"][1].get<float>(),
                                config["Camera"]["Position"][2].get<float>());
@@ -429,7 +441,7 @@ void PBRBasic::PrepareCamera() {
  * @note
  * OpenGLのような単一のユニフォームはVulkanに存在しなくなりました。すべてのシェーダーユニフォームはユニフォームバッファブロックを介して渡されます。
  */
-void PBRBasic::PrepareUniformBuffers() {
+void PBR::PrepareUniformBuffers() {
   VK_CHECK_RESULT(
       uniformBuffers.object.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -452,7 +464,7 @@ void PBRBasic::PrepareUniformBuffers() {
 // Update
 //*-----------------------------------------------------------------------------
 
-void PBRBasic::UpdateUniformBufferVS() {
+void PBR::UpdateUniformBufferVS() {
   // 行列をシェーダーに渡します。
   const auto view = camera.GetViewMatrix();
   const auto proj = camera.GetProjectionMatrix();
@@ -462,7 +474,7 @@ void PBRBasic::UpdateUniformBufferVS() {
   uniformBuffers.object.Copy(&uboVS, sizeof(uboVS));
 }
 
-void PBRBasic::UpdateUniformBufferFS() {
+void PBR::UpdateUniformBufferFS() {
   uboFS.eye = camera.GetPosition();
 
   uboFS.lightsNum = static_cast<int>(config["Lights"].size());
@@ -487,7 +499,7 @@ void PBRBasic::UpdateUniformBufferFS() {
   uniformBuffers.params.Copy(&uboFS, sizeof(uboFS));
 }
 
-void PBRBasic::OnUpdateUIOverlay() {
+void PBR::OnUpdateUIOverlay() {
   uiOverlay.ColorEdit3("Metal Specular", &settings.metalSpecular);
   uiOverlay.SliderFloat("Metal Roughness", &settings.metalRough, 0.0f, 1.0f);
   uiOverlay.ColorEdit3("Non-Metal Diffuse Albedo",
