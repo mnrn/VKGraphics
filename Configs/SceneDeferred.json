@@ -19,53 +19,53 @@
         "Model": "./Assets/Models/dae/Teapot/teapot.dae",
         "Scale": 0.5,
         "Color": [0.9, 0.9, 0.9],
-        "Position": [0.0, 0.0, 0.0]
+        "Position": [0, 0, 0]
     },
     "Torus": {
         "Model": "./Assets/Models/dae/Primitives/torus.dae",
         "Scale": 0.75,
         "Color": [1.0, 0.71, 0.29],
-        "Position": [2.5, 0.5, 0.0],
+        "Position": [2.5, 0.5, 0],
         "Rotate": {
             "Degrees": 30.0,
-            "Axis": [1.0, 0.0, 0.0]
+            "Axis": [1, 0, 0]
         }
     },
     "Floor": {
         "Model": "./Assets/Models/dae/Primitives/plane.dae",
         "Scale": 50.0,
         "Color": [0.4, 0.4, 0.4],
-        "Position": [0.0, -0.75, 0.0]
+        "Position": [0, -0.75, 0]
     },
     "Camera": {
-        "Radius": 5.0,
+        "Radius": 5,
         "RotationSpeed": 0.2
     },
     "Lights": [
         {
-            "Position": [0.0, 3.0, 0.0, 0.0],
-            "Color": [1.0, 1.0, 1.0],
-            "Radius": 25.0
+            "Position": [0, 3, 0, 0],
+            "Color": [1, 1, 1],
+            "Radius": 25
         },
         {
-            "Position": [0.0, 3.0, 10.0, 0.0],
+            "Position": [0, 3, 10, 0],
             "Color": [0.8, 0.99, 0.835],
-            "Radius": 5.0
+            "Radius": 5
         },
         {
-            "Position": [0.0, 3.0, -10.0, 0.0],
+            "Position": [0, 3, -10, 0],
             "Color": [0.925, 0.705, 0.749],
-            "Radius": 5.0
+            "Radius": 5
         },
         {
-            "Position": [10.0, 3.0, 0.0, 0.0],
+            "Position": [10, 3, 0, 0],
             "Color": [0.749, 0.701, 0.988],
-            "Radius": 5.0
+            "Radius": 5
         },
         {
-            "Position": [-10.0, 3.0, 0.0, 0.0],
+            "Position": [-10, 3, 0, 0],
             "Color": [1.0, 0.71, 0.29],
-            "Radius": 5.0
+            "Radius": 5
         }
     ]
 }
