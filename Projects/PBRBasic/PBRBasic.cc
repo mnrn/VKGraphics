@@ -32,6 +32,7 @@ void PBRBasic::OnPostInit() {
 }
 
 void PBRBasic::OnPreDestroy() {
+  models.floor.Destroy(device);
   models.spot.Destroy(device);
 
   uniformBuffers.params.Destroy(device);
@@ -95,13 +96,12 @@ void PBRBasic::BuildCommandBuffers() {
     vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipeline);
 
-    // 三角形の頂点バッファとインデックスバッファをバインドします。
+    // Spotの頂点バッファとインデックスバッファをバインドします。
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
                            &models.spot.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(drawCmdBuffers[i], models.spot.indices.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
-
     // Spot左側
     {
       glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
@@ -149,6 +149,34 @@ void PBRBasic::BuildCommandBuffers() {
       vkCmdDrawIndexed(drawCmdBuffers[i], models.spot.indexCount, 1, 0, 0, 0);
     }
 
+    // Floor
+    {
+      vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                             &models.floor.vertices.buffer, offsets);
+      vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                           VK_INDEX_TYPE_UINT32);
+
+      const auto trans = glm::vec3(config["Floor"]["Position"][0].get<float>(),
+                                   config["Floor"]["Position"][1].get<float>(),
+                                   config["Floor"]["Position"][2].get<float>());
+      auto model = glm::translate(glm::mat4(1.0f), trans);
+      model =
+          glm::scale(model, glm::vec3(config["Floor"]["Scale"].get<float>()));
+      vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
+                         VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), &model);
+      Material mat{};
+      mat.rough = 1.0f;
+      mat.metal = 0.0f;
+      mat.reflect = 1.0f;
+      mat.r = 0.0f;
+      mat.g = 0.0f;
+      mat.b = 0.0f;
+      vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout,
+                         VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(model),
+                         sizeof(mat), &mat);
+      vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0, 0);
+    }
+
     DrawUI(drawCmdBuffers[i]);
 
     vkCmdEndRenderPass(drawCmdBuffers[i]);
@@ -163,7 +191,8 @@ void PBRBasic::OnUpdate(float t) {
   prevTime = t;
 
   const auto LIGHT_ROTATE_SPEED = config["LightRotationSpeed"].get<float>();
-  lightAngle = glm::mod(lightAngle + LIGHT_ROTATE_SPEED * deltaT, glm::two_pi<float>());
+  lightAngle =
+      glm::mod(lightAngle + LIGHT_ROTATE_SPEED * deltaT, glm::two_pi<float>());
   UpdateUniformBufferFS();
 }
 
@@ -174,10 +203,20 @@ void PBRBasic::ViewChanged() { UpdateUniformBufferVS(); }
 //*-----------------------------------------------------------------------------
 
 void PBRBasic::LoadAssets() {
-  const auto &modelPath = config["Spot"]["Model"].get<std::string>();
-  const auto result =
-      models.spot.LoadFromFile(device, modelPath, queue, vertexLayout);
-  BOOST_ASSERT_MSG(result, "Failed to load model!");
+  // Spot
+  {
+    const auto &modelPath = config["Spot"]["Model"].get<std::string>();
+    const auto result =
+        models.spot.LoadFromFile(device, modelPath, queue, vertexLayout);
+    BOOST_ASSERT_MSG(result, "Failed to load model!");
+  }
+  // Floor
+  {
+    const auto &modelPath = config["Floor"]["Model"].get<std::string>();
+    const auto result =
+        models.floor.LoadFromFile(device, modelPath, queue, vertexLayout);
+    BOOST_ASSERT_MSG(result, "Failed to load model!");
+  }
 }
 
 //*-----------------------------------------------------------------------------

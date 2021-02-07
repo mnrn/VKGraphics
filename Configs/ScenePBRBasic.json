@@ -33,6 +33,11 @@
     "Spot": {
         "Model" : "./Assets/Models/dae/Spot/spot_triangulated.dae",
         "Positions": [[-1, 0, 0], [1, 0, 0]]
+    },
+    "Floor": {
+        "Model": "./Assets/Models/dae/Primitives/plane.dae",
+        "Scale": 5,
+        "Position": [0, -1, 0]
     }
 }
   

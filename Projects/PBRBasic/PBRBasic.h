@@ -84,6 +84,7 @@ private:
 
   struct {
     Model spot;
+    Model floor;
   } models;
 
   struct {
