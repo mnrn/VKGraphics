@@ -25,7 +25,35 @@
         "Model": "./Assets/Models/dae/Primitives/plane.dae"
     },
     "Camera": {
+        "Radius": 5.0,
         "RotationSpeed": 1.0
-    }
+    },
+    "Lights": [
+        {
+            "Position": [0.0, 3.0, 0.0, 0.0],
+            "Color": [1.0, 1.0, 1.0],
+            "Radius": 25.0
+        },
+        {
+            "Position": [0.0, 3.0, 10.0, 0.0],
+            "Color": [0.8, 0.99, 0.835],
+            "Radius": 5.0
+        },
+        {
+            "Position": [0.0, 3.0, -10.0, 0.0],
+            "Color": [0.925, 0.705, 0.749],
+            "Radius": 5.0
+        },
+        {
+            "Position": [10.0, 3.0, 0.0, 0.0],
+            "Color": [0.749, 0.701, 0.988],
+            "Radius": 5.0
+        },
+        {
+            "Position": [-10.0, 3.0, 0.0, 0.0],
+            "Color": [1.0, 0.71, 0.29],
+            "Radius": 5.0
+        }
+    ]
 }
   

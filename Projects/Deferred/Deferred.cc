@@ -116,7 +116,7 @@ void Deferred::LoadAssets() {
   {
     modelCreateInfo.scale = glm::vec3(1.0f);
     modelCreateInfo.center = glm::vec3(3.0f, 0.0f, 0.0f);
-    modelCreateInfo.color = glm::vec3(0.9f, 0.5f, 0.2f);
+    modelCreateInfo.color = glm::vec3(1.0f, 0.71f, 0.29f);
     models.torus.LoadFromFile(device,
                               config["Torus"]["Model"].get<std::string>(),
                               queue, vertexLayout, modelCreateInfo);
@@ -599,12 +599,13 @@ void Deferred::BuildDeferredCommandBuffer() {
 //*-----------------------------------------------------------------------------
 
 void Deferred::UpdateUniformBuffers() {
-  camera.SetupOrient(
-      glm::vec3(5.0f * std::sin(camAngle), 1.0f, 5.0f * std::cos(camAngle)),
-      glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  const auto CAMERA_RADIUS = config["Camera"]["Radius"].get<float>();
+  camera.SetupOrient(glm::vec3(CAMERA_RADIUS * std::sin(camAngle), 1.0f,
+                               CAMERA_RADIUS * std::cos(camAngle)),
+                     glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
   camera.SetupPerspective(glm::radians(60.0f),
                           static_cast<float>(swapchain.extent.width) /
-                          static_cast<float>(swapchain.extent.height),
+                              static_cast<float>(swapchain.extent.height),
                           0.3f, 100.0f);
   UpdateOffscreenUniformBuffers();
   UpdateCompositionUniformBuffers();
@@ -623,27 +624,19 @@ void Deferred::UpdateOffscreenUniformBuffers() {
 void Deferred::UpdateCompositionUniformBuffers() {
   uboComposition.viewPos = glm::vec4(camera.GetPosition(), 0.0f);
 
-  uboComposition.lights[0].pos = glm::vec4(0.0f, 3.0f, 0.0f, 0.0f);
-  uboComposition.lights[0].color = glm::vec3(1.0f);
-  uboComposition.lights[0].radius = 25.0f;
+  int i = 0;
+  for (const auto &light : config["Lights"]) {
+    for (int j = 0; j < 4; j++) {
+      uboComposition.lights[i].pos[j] = light["Position"][j].get<float>();
+    }
+    for (int j = 0; j < 3; j++) {
+      uboComposition.lights[i].color[j] = light["Color"][j].get<float>();
+    }
+    uboComposition.lights[i].radius = light["Radius"].get<float>();
+    i++;
+  }
 
-  uboComposition.lights[1].pos = glm::vec4(0.0f, 3.0f, 10.0f, 0.0f);
-  uboComposition.lights[1].color = glm::vec3(0.8f, 0.99f, 0.835f);
-  uboComposition.lights[1].radius = 5.0f;
-
-  uboComposition.lights[2].pos = glm::vec4(0.0f, 3.0f, -10.0f, 0.0f);
-  uboComposition.lights[2].color = glm::vec3(0.925f, 0.705f, 0.749f);
-  uboComposition.lights[2].radius = 5.0f;
-
-  uboComposition.lights[3].pos = glm::vec4(10.0f, 3.0f, 0.0f, 0.0f);
-  uboComposition.lights[3].color = glm::vec3(0.749f, 0.701f, 0.988f);
-  uboComposition.lights[3].radius = 5.0f;
-
-  uboComposition.lights[4].pos = glm::vec4(-10.0f, 3.0f, 0.0f, 0.0f);
-  uboComposition.lights[4].color = glm::vec3(0.894f, 0.788f, 0.180f);
-  uboComposition.lights[4].radius = 5.0f;
-
-  uboComposition.lightsNum = 5;
+  uboComposition.lightsNum = static_cast<int>(config["Lights"].size());
   uboComposition.dispTarget = settings.dispRenderTarget;
 
   uniformBuffers.composition.Copy(&uboComposition, sizeof(uboComposition));
