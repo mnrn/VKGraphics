@@ -49,6 +49,41 @@ AndroidやiOSの対応は未定になります。
   
 リポジトリのルートディレクトリにCMakeLists.txtがあるので詳しくはそちらを参照ください。  
 
+## Features
+
+### 物理ベースレンダリング (Physically Based Rendering)
+
+![PBR](https://github.com/mnrn/ReVK/blob/main/Docs/Images/pbr.png)
+
+BRDFによるMicrofacet Modelの描画を行っています。  
+このあたりの理論はGoogleの物理ベースレンダリングエンジンFilamentのドキュメントなどを参考にしました。  
+左が金属(Metallic Material)、右が非金属(Dielectric Material)です。
+
+GUIの使用を少し変更したこともあり、細かいところは[移植元](https://github.com/mnrn/ReGL)から移植していませんが準備はしています。  
+また、IBLなどはいまのところ実装しておりません。
+
+---
+
+### 遅延シェーディング (Deferred Shading)
+
+![Deferred](https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred.png)
+
+2次元の画面空間上でシェーディングを行う手法です。
+半透明をうまく扱えない点やメモリを大きく消費する点などからゲームではあまり使われないかもしれません。
+大量のライトを使う場合は候補に入れても良いかもしれません。
+
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_position.png" width=500>
+
+位置情報になります。
+
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_normal.png" width=500>
+
+法線情報になります。
+
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_albedo.png" width=500>
+
+色情報になります。
+
 ## 参考
 
 [OpenGL 4 Shading Language Cookbook - Third Edition](https://www.packtpub.com/product/opengl-4-shading-language-cookbook-third-edition/9781789342253)  
