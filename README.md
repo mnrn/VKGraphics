@@ -68,8 +68,8 @@ GUIの使用を少し変更したこともあり、細かいところは[移植�
 
 ![Deferred](https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred.png)
 
-2次元の画面空間上でシェーディングを行う手法です。
-半透明をうまく扱えない点やメモリを大きく消費する点などからゲームではあまり使われないかもしれません。
+2次元の画面空間上でシェーディングを行う手法です。  
+半透明をうまく扱えない点やメモリを大きく消費する点などからゲームではあまり使われないかもしれません。  
 大量のライトを使う場合は候補に入れても良いかもしれません。
 
 <img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_position.png" width=300>
