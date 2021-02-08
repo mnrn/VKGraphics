@@ -72,17 +72,17 @@ GUIの使用を少し変更したこともあり、細かいところは[移植�
 半透明をうまく扱えない点やメモリを大きく消費する点などからゲームではあまり使われないかもしれません。
 大量のライトを使う場合は候補に入れても良いかもしれません。
 
-<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_position.png" width=500>
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_position.png" width=300>
 
-位置情報になります。
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_normal.png" width=300>
 
-<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_normal.png" width=500>
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_albedo.png" width=300>
 
-法線情報になります。
+上から位置情報、法線情報、色情報を格納したテクスチャを表示させています。
 
-<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_albedo.png" width=500>
+<img src="https://github.com/mnrn/ReVK/blob/main/Docs/Images/deferred_visualize.png" width=300>
 
-色情報になります。
+3つの情報からライティングを施した結果です。
 
 ## 参考
 
