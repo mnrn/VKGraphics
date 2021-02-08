@@ -171,10 +171,11 @@ void Gui::InitImGui(GLFWwindow *window) const {
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
-  ImGui::StyleColorsClassic();
-
   ImGuiIO &io = ImGui::GetIO();
   io.IniFilename = nullptr;
+
+  // スタイルカラーを設定します。
+  ImGui::StyleColorsClassic();
 
   // 英語フォントと日本語フォントを混在させます。
   ImFontConfig config;
@@ -361,7 +362,7 @@ void Gui::SetupPipeline(const Device &device, VkPipelineCache pipelineCache,
   colorBlendAttachmentState.blendEnable = VK_TRUE;
   colorBlendAttachmentState.colorWriteMask =
       VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-      VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT;
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
   colorBlendAttachmentState.dstColorBlendFactor =
       VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;

@@ -1,3 +1,4 @@
 *.h linguist-language=C++
 Lib/glad/* linguist-vendored
 *.ttf filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
