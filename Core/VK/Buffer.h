@@ -14,7 +14,7 @@ struct Buffer {
   [[nodiscard]] VkResult Create(const Device &device,
                                 VkBufferUsageFlags bufferUsageFlags,
                                 VkMemoryPropertyFlags memoryPropertyFlags,
-                                void *data, VkDeviceSize size);
+                                VkDeviceSize size, void* data);
   [[nodiscard]] VkResult Create(const Device &device,
                                 VkBufferUsageFlags bufferUsageFlags,
                                 VkMemoryPropertyFlags memoryPropertyFlags,

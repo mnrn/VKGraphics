@@ -148,12 +148,12 @@ bool Model::LoadFromFile(const Device &device, const std::string &filepath,
   VK_CHECK_RESULT(vertexStaging.Create(device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       vertexBuffer.data(), vtxBufSize));
+                                       vtxBufSize, vertexBuffer.data()));
   Buffer indexStaging;
   VK_CHECK_RESULT(indexStaging.Create(device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                      indexBuffer.data(), idxBufSize));
+                                      idxBufSize, indexBuffer.data()));
 
   // デバイスのローカルターゲットバッファを生成します。
   VK_CHECK_RESULT(vertices.Create(

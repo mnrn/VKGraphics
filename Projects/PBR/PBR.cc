@@ -434,14 +434,14 @@ void PBR::PrepareUniformBuffers() {
       uniformBuffers.object.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                   &uboVS, sizeof(uboVS)));
+                                   sizeof(uboVS), &uboVS));
   VK_CHECK_RESULT(uniformBuffers.object.Map(device));
 
   VK_CHECK_RESULT(
       uniformBuffers.params.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                   &uboFS, sizeof(uboFS)));
+                                   sizeof(uboFS), &uboFS));
   VK_CHECK_RESULT(uniformBuffers.params.Map(device));
 
   UpdateUniformBufferVS();
