@@ -436,14 +436,14 @@ void Deferred::PrepareUniformBuffers() {
       device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-      &uboOffscreenVS, sizeof(uboOffscreenVS)));
+      sizeof(uboOffscreenVS), &uboOffscreenVS));
   VK_CHECK_RESULT(uniformBuffers.offscreen.Map(device));
 
   VK_CHECK_RESULT(uniformBuffers.composition.Create(
       device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-      &uboComposition, sizeof(uboComposition)));
+      sizeof(uboComposition), &uboComposition));
   VK_CHECK_RESULT(uniformBuffers.composition.Map(device));
 
   UpdateUniformBuffers();
