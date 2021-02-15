@@ -563,13 +563,13 @@ void Deferred::BuildDeferredCommandBuffer() {
 
   vkCmdBindPipeline(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipelines.offscreen);
+  vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
+                          nullptr);
   VkDeviceSize offsets[] = {0};
 
   // Teapot
   {
-    vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
-                            nullptr);
     vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
                            &models.teapot.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(offscreenCmdBuffer, models.teapot.indices.buffer, 0,
@@ -583,9 +583,6 @@ void Deferred::BuildDeferredCommandBuffer() {
   }
   // Torus
   {
-    vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
-                            nullptr);
     vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
                            &models.torus.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(offscreenCmdBuffer, models.torus.indices.buffer, 0,
@@ -609,9 +606,6 @@ void Deferred::BuildDeferredCommandBuffer() {
 
   // Floor
   {
-    vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSets.offscreen, 0,
-                            nullptr);
     vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
                            &models.floor.vertices.buffer, offsets);
     vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
