@@ -11,89 +11,10 @@
 #include <gli/gli.hpp>
 #include <iostream>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
-
 #include "VK/Common.h"
 #include "VK/Device.h"
 #include "VK/Initializer.h"
 #include "VK/Utils.h"
-
-namespace Pixels {
-[[maybe_unused]] static stbi_uc *Load(const std::string &path, int &w, int &h,
-                                      bool flip = true) {
-  int bytesPerPix;
-  stbi_set_flip_vertically_on_load(flip);
-  return stbi_load(path.c_str(), &w, &h, &bytesPerPix, 4);
-}
-
-[[maybe_unused]] static void Free(unsigned char *data) {
-  stbi_image_free(data);
-}
-} // namespace Pixels
-
-namespace Mipmaps {
-[[maybe_unused]] static void
-Generate(VkImage image, int32_t width, int32_t height, int32_t depth,
-         uint32_t layerCount, uint32_t mipLevels, VkCommandBuffer commandBuffer,
-         VkFilter blitFilter, VkImageLayout initialLayout,
-         VkImageLayout finalLayout) {
-  VkImageSubresourceRange imageSubresourceRange{};
-  imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageSubresourceRange.baseMipLevel = 0;
-  imageSubresourceRange.levelCount = 1;
-  imageSubresourceRange.baseArrayLayer = 0;
-  imageSubresourceRange.layerCount = layerCount;
-
-  TransitionImageLayout(commandBuffer, image, imageSubresourceRange,
-                        initialLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-  for (uint32_t i = 1; i < mipLevels; i++) {
-    VkImageBlit imageBlit{};
-
-    // Source
-    imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageBlit.srcSubresource.layerCount = layerCount;
-    imageBlit.srcSubresource.mipLevel = i - 1;
-    imageBlit.srcOffsets[1].x = std::max(width >> i, 1);
-    imageBlit.srcOffsets[1].y = std::max(height >> i, 1);
-    imageBlit.srcOffsets[1].z = std::max(depth >> i, 1);
-
-    // Destination
-    imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageBlit.dstSubresource.layerCount = 1;
-    imageBlit.dstSubresource.mipLevel = i;
-    imageBlit.dstOffsets[1].x = std::max(width >> i, 1);
-    imageBlit.dstOffsets[1].y = std::max(height >> i, 1);
-    imageBlit.dstOffsets[1].z = std::max(depth >> i, 1);
-
-    VkImageSubresourceRange mipSubresourceRange{};
-    mipSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    mipSubresourceRange.baseMipLevel = i;
-    mipSubresourceRange.levelCount = 1;
-    mipSubresourceRange.layerCount = layerCount;
-
-    // 現在のミップレベルを転送先に送ります。
-    TransitionImageLayout(commandBuffer, image, mipSubresourceRange,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    // 前のミップレベルからBlitします。
-    vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit,
-                   blitFilter);
-
-    // 次のループに備え、現在のミップレベルを転送元に遷移させます。
-    TransitionImageLayout(commandBuffer, image, mipSubresourceRange,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  }
-
-  imageSubresourceRange.levelCount = mipLevels;
-  TransitionImageLayout(commandBuffer, image, imageSubresourceRange,
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, finalLayout);
-}
-} // namespace Mipmaps
 
 void Texture::Destroy(const Device &device) const {
   if (sampler != nullptr) {
@@ -302,8 +223,9 @@ void Texture2D::Load(const Device &device, const std::string &filepath,
       VK_COMPONENT_SWIZZLE_B,
       VK_COMPONENT_SWIZZLE_A,
   };
-  imageViewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0,
-                                          1};
+  imageViewCreateInfo.subresourceRange = {
+      VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1,
+  };
   // 線形タイリングは通常ミップマップをサポートしません。
   // 適切なタイリングが使用されている場合にのみミップマップカウントを設定します。
   imageViewCreateInfo.subresourceRange.levelCount = useStaging ? mipLevels : 1;
@@ -311,6 +233,114 @@ void Texture2D::Load(const Device &device, const std::string &filepath,
   VK_CHECK_RESULT(
       vkCreateImageView(device, &imageViewCreateInfo, nullptr, &view));
 
+  descriptor.sampler = sampler;
+  descriptor.imageView = view;
+  descriptor.imageLayout = imageLayout;
+}
+
+/**
+ * @brief バッファから2Dテクスチャを生成します。
+ * @param device
+ * @param buffer
+ * @param bufferSize
+ * @param format
+ * @param texWidth
+ * @param texHeight
+ * @param copyQueue
+ * @param filter
+ * @param imageUsageFlags
+ * @param imageLayout
+ */
+void Texture2D::FromBuffer(const Device &device, void *buffer,
+                           VkDeviceSize bufferSize, VkFormat format,
+                           uint32_t texWidth, uint32_t texHeight,
+                           VkQueue copyQueue, VkFilter filter,
+                           VkImageUsageFlags imageUsageFlags,
+                           VkImageLayout imageLayout) {
+  BOOST_ASSERT(buffer);
+
+  width = texWidth;
+  height = texHeight;
+  mipLevels = 1;
+
+  VkCommandBuffer copyCmd = device.CreateCommandBuffer();
+
+  // 生の画像データを含むホストに表示されるステージングバッファを生成します。
+  VkBufferCreateInfo bufferCreateInfo = Initializer::BufferCreateInfo(
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT, bufferSize);
+  VkBuffer stagingBuffer;
+  VK_CHECK_RESULT(
+      vkCreateBuffer(device, &bufferCreateInfo, nullptr, &stagingBuffer));
+
+  // ステージングバッファのメモリ要件を取得します。
+  VkMemoryRequirements memoryRequirements;
+  vkGetBufferMemoryRequirements(device, stagingBuffer, &memoryRequirements);
+
+  VkMemoryAllocateInfo memoryAllocateInfo = Initializer::MemoryAllocateInfo();
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  memoryAllocateInfo.memoryTypeIndex =
+      device.FindMemoryType(memoryRequirements.memoryTypeBits,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  VkDeviceMemory stagingMemory;
+  VK_CHECK_RESULT(
+      vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &stagingMemory));
+  VK_CHECK_RESULT(vkBindBufferMemory(device, stagingBuffer, stagingMemory, 0));
+
+  // ステージングバッファへテクスチャのデータをコピーします。
+  std::byte *data;
+  VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, memoryRequirements.size,
+                              0, reinterpret_cast<void **>(&data)));
+  std::memcpy(data, buffer, bufferSize);
+  vkUnmapMemory(device, stagingMemory);
+
+  VkBufferImageCopy bufferCopyRegion{};
+  bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  bufferCopyRegion.imageSubresource.mipLevel = 0;
+  bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+  bufferCopyRegion.imageSubresource.layerCount = 1;
+  bufferCopyRegion.imageExtent.width = width;
+  bufferCopyRegion.imageExtent.height = height;
+  bufferCopyRegion.imageExtent.depth = 1;
+  bufferCopyRegion.bufferOffset = 0;
+
+  // 最適なタイルターゲット画像を生成します。
+  CreateImage(device, image, memory, format, VK_IMAGE_TYPE_2D, width, height, 1,
+              mipLevels, 1, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+              imageUsageFlags | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+              VK_IMAGE_TILING_OPTIMAL);
+
+  // イメージバリア
+  VkImageSubresourceRange imageSubresourceRange{};
+  imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  imageSubresourceRange.baseMipLevel = 0;
+  imageSubresourceRange.levelCount = mipLevels;
+  imageSubresourceRange.layerCount = 1;
+  TransitionImageLayout(copyCmd, image, imageSubresourceRange,
+                        VK_IMAGE_LAYOUT_UNDEFINED,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  // ステージングバッファからミップレベルをコピーします。
+  vkCmdCopyBufferToImage(copyCmd, stagingBuffer, image,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                         &bufferCopyRegion);
+
+  // すべてのミップレベルがコピーされた後、テクスチャのイメージレイアウトをシェーダー読み取りに変更します。
+  TransitionImageLayout(copyCmd, image, imageSubresourceRange,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageLayout);
+  device.FlushCommandBuffer(copyCmd, copyQueue);
+
+  // ステージングリソースを破棄します。
+  vkFreeMemory(device, stagingMemory, nullptr);
+  vkDestroyBuffer(device, stagingBuffer, nullptr);
+
+  // サンプラーの生成を行います。
+  CreateSampler(device, sampler, filter, filter, VK_FALSE, VK_COMPARE_OP_NEVER);
+
+  // イメージビューの生成を行います。
+  CreateImageView(device, view, image, VK_IMAGE_VIEW_TYPE_2D, format);
+
+  // 記述子セットの設定に使用する情報の更新を行います。
   descriptor.sampler = sampler;
   descriptor.imageView = view;
   descriptor.imageLayout = imageLayout;

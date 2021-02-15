@@ -88,5 +88,6 @@ set(TARGETS
     TextureMapping
     PBR
     Deferred
+    SSAO
     )
 buildAll()

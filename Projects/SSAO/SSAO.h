@@ -36,6 +36,9 @@ public:
   void ViewChanged() override;
 
 private:
+  static constexpr inline size_t KERNEL_SIZE = 64;
+  static constexpr inline size_t ROT_TEX_SIZE = 4;
+
   VertexLayout vertexLayout{
       {
           VertexLayoutComponent::Position,
@@ -61,6 +64,12 @@ private:
     alignas(4) float nearPlane;
     alignas(4) float farPlane;
   } uboScene;
+
+  struct {
+    alignas(16) glm::vec4 kernel[KERNEL_SIZE];
+    alignas(4) float radius;
+    alignas(4) float bias;
+  } uboKernel;
 
   struct Light {
     alignas(16) glm::vec4 pos;
@@ -97,8 +106,7 @@ private:
   } pipelineLayouts;
 
   struct {
-    VkDescriptorSet teapot;
-    VkDescriptorSet floor;
+    VkDescriptorSet gBuffer;
     VkDescriptorSet ssao;
     VkDescriptorSet blur;
     VkDescriptorSet lighting;
