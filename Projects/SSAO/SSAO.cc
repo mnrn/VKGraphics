@@ -159,7 +159,7 @@ void SSAO::SetupDescriptorSet() {
     writeDescriptorSets = {
         Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
                                         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                        &uniformBuffers.ssao.descriptor),
+                                        &uniformBuffers.scene.descriptor),
     };
     vkUpdateDescriptorSets(device,
                            static_cast<uint32_t>(writeDescriptorSets.size()),

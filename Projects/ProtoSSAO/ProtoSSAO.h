@@ -27,10 +27,9 @@ public:
   void UpdateOffscreenUniformBuffers();
   void UpdateCompositionUniformBuffers();
 
-  void SetupDescriptorSetLayout();
-  void SetupPipelines();
   void SetupDescriptorPool();
   void SetupDescriptorSet();
+  void SetupPipelines();
 
   void BuildCommandBuffers() override;
 
@@ -91,13 +90,22 @@ private:
     VkPipeline gBuffer;
     VkPipeline lighting;
   } pipelines;
-  VkPipelineLayout pipelineLayout;
+
+  struct {
+    VkPipelineLayout gBuffer;
+    VkPipelineLayout lighting;
+  } pipelineLayouts;
 
   struct {
     VkDescriptorSet gBuffer;
     VkDescriptorSet lighting;
+    const uint32_t maxSets = 2;
   } descriptorSets;
-  VkDescriptorSetLayout descriptorSetLayout;
+
+  struct {
+    VkDescriptorSetLayout gBuffer;
+    VkDescriptorSetLayout lighting;
+  } descriptorSetLayouts;
 
   Framebuffer offscreenFramebuffer;
 

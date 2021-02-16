@@ -23,7 +23,6 @@ void ProtoSSAO::OnPostInit() {
   PrepareUniformBuffers();
 
   SetupDescriptorPool();
-  SetupDescriptorSetLayout();
   SetupDescriptorSet();
   SetupPipelines();
 
@@ -37,10 +36,11 @@ void ProtoSSAO::OnPreDestroy() {
   vkDestroyPipeline(device, pipelines.lighting, nullptr);
   vkDestroyPipeline(device, pipelines.gBuffer, nullptr);
 
-  vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+  vkDestroyPipelineLayout(device, pipelineLayouts.lighting, nullptr);
+  vkDestroyPipelineLayout(device, pipelineLayouts.gBuffer, nullptr);
 
-  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.lighting, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.gBuffer, nullptr);
   offscreenFramebuffer.Destroy(device);
 
   uniformBuffers.lighting.Destroy(device);
@@ -138,47 +138,6 @@ void ProtoSSAO::LoadAssets() {
 // Setup
 //*-----------------------------------------------------------------------------
 
-/**
- * @brief 使用される記述子のレイアウトを設定します。<br>
- * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
- * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
- */
-void ProtoSSAO::SetupDescriptorSetLayout() {
-  std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-      Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                              VK_SHADER_STAGE_VERTEX_BIT, 0),
-      Initializer::DescriptorSetLayoutBinding(
-          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-          VK_SHADER_STAGE_FRAGMENT_BIT, 1),
-      Initializer::DescriptorSetLayoutBinding(
-          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-          VK_SHADER_STAGE_FRAGMENT_BIT, 2),
-      Initializer::DescriptorSetLayoutBinding(
-          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-          VK_SHADER_STAGE_FRAGMENT_BIT, 3),
-      Initializer::DescriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                              VK_SHADER_STAGE_FRAGMENT_BIT, 4),
-  };
-
-  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo =
-      Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
-  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
-      device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
-
-  // すべてのパイプラインで使用されるようにパイプラインレイアウトを共有します。
-  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
-      Initializer::PipelineLayoutCreateInfo(&descriptorSetLayout);
-  std::vector<VkPushConstantRange> pushConstantRanges = {
-      Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT |VK_SHADER_STAGE_FRAGMENT_BIT,
-                                     sizeof(pushConsts), 0),
-  };
-  pipelineLayoutCreateInfo.pushConstantRangeCount =
-      static_cast<uint32_t>(pushConstantRanges.size());
-  pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
-  VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
-                                         nullptr, &pipelineLayout));
-}
-
 void ProtoSSAO::SetupDescriptorPool() {
   // APIに記述子の最大数を通知する必要があります。
   std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
@@ -189,67 +148,147 @@ void ProtoSSAO::SetupDescriptorPool() {
 
   // グローバル記述子プールを生成します。
   VkDescriptorPoolCreateInfo descriptorPoolInfo =
-      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes, 2);
+      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes,
+                                            descriptorSets.maxSets);
 
   VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
                                          &descriptorPool));
 }
 
+/**
+ * @brief 使用される記述子のレイアウトを設定します。<br>
+ * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
+ * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
+ */
 void ProtoSSAO::SetupDescriptorSet() {
-  // グローバル記述子プールから新しい記述子セットを割り当てます。
+  std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings{};
+  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
+      Initializer::PipelineLayoutCreateInfo();
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo =
-      Initializer::DescriptorSetAllocateInfo(descriptorPool,
-                                             &descriptorSetLayout, 1);
+      Initializer::DescriptorSetAllocateInfo(descriptorPool, nullptr, 1);
+  std::vector<VkWriteDescriptorSet> writeDescriptorSets{};
+  std::vector<VkDescriptorImageInfo> imageDescriptors{};
 
-  // オフスクリーンカラーアタッチメントのイメージ記述子を設定します。　
-  VkDescriptorImageInfo texPosDesc = Initializer::DescriptorImageInfo(
-      offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[0].view,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  VkDescriptorImageInfo texNormDesc = Initializer::DescriptorImageInfo(
-      offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[1].view,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  VkDescriptorImageInfo texAlbedoDesc = Initializer::DescriptorImageInfo(
-      offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[2].view,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  // G-Buffer creation
+  {
+    descriptorSetLayoutBindings = {
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 2),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 3),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
+    };
+    descriptorSetLayoutCreateInfo =
+        Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
+                                    nullptr, &descriptorSetLayouts.gBuffer));
 
-  // Deferred Composition
-  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                                           &descriptorSets.lighting));
-  std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-      Initializer::WriteDescriptorSet(descriptorSets.lighting,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      1, &texPosDesc),
-      Initializer::WriteDescriptorSet(descriptorSets.lighting,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      2, &texNormDesc),
-      Initializer::WriteDescriptorSet(descriptorSets.lighting,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      3, &texAlbedoDesc),
-      Initializer::WriteDescriptorSet(descriptorSets.lighting,
-                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4,
-                                      &uniformBuffers.lighting.descriptor),
-  };
-  vkUpdateDescriptorSets(device,
-                         static_cast<uint32_t>(writeDescriptorSets.size()),
-                         writeDescriptorSets.data(), 0, nullptr);
+    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayouts.gBuffer;
+    std::vector<VkPushConstantRange> pushConstantRanges = {
+        Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT |
+                                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                                       sizeof(pushConsts), 0),
+    };
+    pipelineLayoutCreateInfo.pushConstantRangeCount =
+        static_cast<uint32_t>(pushConstantRanges.size());
+    pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
+                                           nullptr, &pipelineLayouts.gBuffer));
 
-  // Offscreen Rendering
-  VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                                           &descriptorSets.gBuffer));
-  writeDescriptorSets = {
-      Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
-                                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                      &uniformBuffers.gBuffer.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      1, &textures.floor.descriptor),
-      Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
-                                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      2, &textures.wall.descriptor)
-  };
-  vkUpdateDescriptorSets(device,
-                         static_cast<uint32_t>(writeDescriptorSets.size()),
-                         writeDescriptorSets.data(), 0, nullptr);
+    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayouts.gBuffer;
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                                             &descriptorSets.gBuffer));
+    writeDescriptorSets = {
+        Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
+                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+                                        &uniformBuffers.gBuffer.descriptor),
+        Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
+                                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                                        &textures.floor.descriptor),
+        Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
+                                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2,
+                                        &textures.wall.descriptor),
+    };
+    vkUpdateDescriptorSets(device,
+                           static_cast<uint32_t>(writeDescriptorSets.size()),
+                           writeDescriptorSets.data(), 0, nullptr);
+  }
+
+  // Composition + Lighting
+  {
+    descriptorSetLayoutBindings = {
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 2),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 3),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
+    };
+    descriptorSetLayoutCreateInfo =
+        Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
+                                    nullptr, &descriptorSetLayouts.lighting));
+
+    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayouts.lighting;
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+    pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
+                                           nullptr, &pipelineLayouts.lighting));
+
+    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayouts.lighting;
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                                             &descriptorSets.lighting));
+
+    imageDescriptors = {
+        Initializer::DescriptorImageInfo(
+            offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[0].view,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        Initializer::DescriptorImageInfo(
+            offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[1].view,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        Initializer::DescriptorImageInfo(
+            offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[2].view,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+    };
+    writeDescriptorSets = {
+        Initializer::WriteDescriptorSet(descriptorSets.lighting,
+                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+                                        &uniformBuffers.gBuffer.descriptor),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            1, &imageDescriptors[0]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            2, &imageDescriptors[1]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            3, &imageDescriptors[2]),
+        Initializer::WriteDescriptorSet(descriptorSets.lighting,
+                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4,
+                                        &uniformBuffers.lighting.descriptor),
+    };
+    vkUpdateDescriptorSets(device,
+                           static_cast<uint32_t>(writeDescriptorSets.size()),
+                           writeDescriptorSets.data(), 0, nullptr);
+  }
 }
 
 /**
@@ -303,7 +342,7 @@ void ProtoSSAO::SetupPipelines() {
 
   // パイプラインに使用されるレイアウトとレンダーパスを指定します。
   VkGraphicsPipelineCreateInfo pipelineCreateInfo =
-      Initializer::GraphicsPipelineCreateInfo(pipelineLayout, renderPass);
+      Initializer::GraphicsPipelineCreateInfo(pipelineLayouts.lighting, renderPass);
   pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
   pipelineCreateInfo.pRasterizationState = &rasterizationState;
   pipelineCreateInfo.pColorBlendState = &colorBlendState;
@@ -370,6 +409,7 @@ void ProtoSSAO::SetupPipelines() {
 
   // レンダーパスは別にします。
   pipelineCreateInfo.renderPass = offscreenFramebuffer.renderPass;
+  pipelineCreateInfo.layout = pipelineLayouts.gBuffer;
 
   // カラーアタッチメントに何も描画しないようにします。
   std::array<VkPipelineColorBlendAttachmentState, 3>
@@ -508,8 +548,8 @@ void ProtoSSAO::BuildCommandBuffers() {
 
     // 記述子セットとパイプラインのバインド
     vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSets.lighting, 0,
-                            nullptr);
+                            pipelineLayouts.lighting, 0, 1,
+                            &descriptorSets.lighting, 0, nullptr);
     vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines.lighting);
 
@@ -571,8 +611,8 @@ void ProtoSSAO::BuildDeferredCommandBuffer() {
   vkCmdBindPipeline(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipelines.gBuffer);
   vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipelineLayout, 0, 1, &descriptorSets.gBuffer, 0,
-                          nullptr);
+                          pipelineLayouts.gBuffer, 0, 1,
+                          &descriptorSets.gBuffer, 0, nullptr);
   VkDeviceSize offsets[] = {0};
 
   // Teapot
@@ -587,12 +627,15 @@ void ProtoSSAO::BuildDeferredCommandBuffer() {
                                  teapot["Position"][1].get<float>(),
                                  teapot["Position"][2].get<float>());
     auto model = glm::translate(glm::mat4(1.0f), trans);
-    model = glm::rotate(model, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    model =
+        glm::rotate(model, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::scale(model, scale);
     pushConsts.model = model;
     pushConsts.tex = 0;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConsts), &pushConsts);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
+                       VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(pushConsts), &pushConsts);
     vkCmdDrawIndexed(offscreenCmdBuffer, models.teapot.indexCount, 1, 0, 0, 0);
   }
 
@@ -608,8 +651,10 @@ void ProtoSSAO::BuildDeferredCommandBuffer() {
     model = glm::scale(model, scale);
     pushConsts.model = model;
     pushConsts.tex = 1;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConsts), &pushConsts);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
+                       VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(pushConsts), &pushConsts);
     vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
   }
 
@@ -627,8 +672,10 @@ void ProtoSSAO::BuildDeferredCommandBuffer() {
     model = glm::scale(model, scale);
     pushConsts.model = model;
     pushConsts.tex = 2;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConsts), &pushConsts);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
+                       VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(pushConsts), &pushConsts);
     vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
   }
 
@@ -647,8 +694,10 @@ void ProtoSSAO::BuildDeferredCommandBuffer() {
     model = glm::scale(model, scale);
     pushConsts.model = model;
     pushConsts.tex = 2;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConsts), &pushConsts);
+    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
+                       VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(pushConsts), &pushConsts);
     vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
   }
 
