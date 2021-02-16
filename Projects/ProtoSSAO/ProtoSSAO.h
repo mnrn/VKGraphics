@@ -65,7 +65,7 @@ private:
   struct {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-  } uboOffscreenVS;
+  } uboGBuffer;
 
   struct Light {
     alignas(16) glm::vec4 pos;
@@ -79,7 +79,7 @@ private:
     alignas(4) int displayRenderTarget;
     alignas(4) bool useBlur;
     alignas(4) float ao;
-  } uboComposition;
+  } uboLighting;
 
   struct {
     Buffer gBuffer;

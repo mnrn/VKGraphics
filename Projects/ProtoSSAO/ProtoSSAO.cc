@@ -184,8 +184,6 @@ void ProtoSSAO::SetupDescriptorSet() {
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 3),
-        Initializer::DescriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -228,7 +226,7 @@ void ProtoSSAO::SetupDescriptorSet() {
   {
     descriptorSetLayoutBindings = {
         Initializer::DescriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 1),
@@ -238,8 +236,6 @@ void ProtoSSAO::SetupDescriptorSet() {
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 3),
-        Initializer::DescriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -271,7 +267,7 @@ void ProtoSSAO::SetupDescriptorSet() {
     writeDescriptorSets = {
         Initializer::WriteDescriptorSet(descriptorSets.lighting,
                                         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                        &uniformBuffers.gBuffer.descriptor),
+                                        &uniformBuffers.lighting.descriptor),
         Initializer::WriteDescriptorSet(
             descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             1, &imageDescriptors[0]),
@@ -281,9 +277,6 @@ void ProtoSSAO::SetupDescriptorSet() {
         Initializer::WriteDescriptorSet(
             descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             3, &imageDescriptors[2]),
-        Initializer::WriteDescriptorSet(descriptorSets.lighting,
-                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4,
-                                        &uniformBuffers.lighting.descriptor),
     };
     vkUpdateDescriptorSets(device,
                            static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -483,14 +476,14 @@ void ProtoSSAO::PrepareUniformBuffers() {
       uniformBuffers.gBuffer.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                    sizeof(uboOffscreenVS), &uboOffscreenVS));
+                                    sizeof(uboGBuffer), &uboGBuffer));
   VK_CHECK_RESULT(uniformBuffers.gBuffer.Map(device));
 
   VK_CHECK_RESULT(
       uniformBuffers.lighting.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     sizeof(uboComposition), &uboComposition));
+                                     sizeof(uboLighting), &uboLighting));
   VK_CHECK_RESULT(uniformBuffers.lighting.Map(device));
 
   UpdateUniformBuffers();
@@ -728,32 +721,32 @@ void ProtoSSAO::UpdateUniformBuffers() {
 
 void ProtoSSAO::UpdateOffscreenUniformBuffers() {
   // 行列をシェーダーに渡します。
-  uboOffscreenVS.view = camera.GetViewMatrix();
-  uboOffscreenVS.proj = camera.GetProjectionMatrix();
+  uboGBuffer.view = camera.GetViewMatrix();
+  uboGBuffer.proj = camera.GetProjectionMatrix();
 
   // ユニフォームバッファへコピーします。
-  uniformBuffers.gBuffer.Copy(&uboOffscreenVS, sizeof(uboOffscreenVS));
+  uniformBuffers.gBuffer.Copy(&uboGBuffer, sizeof(uboGBuffer));
 }
 
 void ProtoSSAO::UpdateCompositionUniformBuffers() {
   int i = 0;
   for (const auto &light : config["Lights"]) {
     for (int j = 0; j < 4; j++) {
-      uboComposition.lights[i].pos[j] = light["Position"][j].get<float>();
+      uboLighting.lights[i].pos[j] = light["Position"][j].get<float>();
     }
-    uboComposition.lights[i].pos =
-        uboOffscreenVS.view * uboComposition.lights[i].pos;
+    uboLighting.lights[i].pos =
+        uboGBuffer.view * uboLighting.lights[i].pos;
     for (int j = 0; j < 3; j++) {
-      uboComposition.lights[i].La[j] = light["La"][j].get<float>();
-      uboComposition.lights[i].Ld[j] = light["Ld"][j].get<float>();
+      uboLighting.lights[i].La[j] = light["La"][j].get<float>();
+      uboLighting.lights[i].Ld[j] = light["Ld"][j].get<float>();
     }
     i++;
   }
 
-  uboComposition.lightsNum = static_cast<int>(config["Lights"].size());
-  uboComposition.displayRenderTarget = settings.dispRenderTarget;
+  uboLighting.lightsNum = static_cast<int>(config["Lights"].size());
+  uboLighting.displayRenderTarget = settings.dispRenderTarget;
 
-  uniformBuffers.lighting.Copy(&uboComposition, sizeof(uboComposition));
+  uniformBuffers.lighting.Copy(&uboLighting, sizeof(uboLighting));
 }
 
 void ProtoSSAO::OnUpdateUIOverlay() {

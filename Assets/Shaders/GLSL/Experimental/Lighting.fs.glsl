@@ -14,7 +14,7 @@ struct Light {
     vec3 Ld;
 };
 
-layout (binding = 4) uniform UniformBufferObject {
+layout (binding = 0) uniform UniformBufferObject {
     Light Lights[8];
     int LightsNum;
     int DisplayRenderTarget;
