@@ -22,10 +22,10 @@ void ProtoSSAO::OnPostInit() {
   PrepareOffscreenFramebuffer();
   PrepareUniformBuffers();
 
-  SetupDescriptorSetLayout();
-  SetupPipelines();
   SetupDescriptorPool();
+  SetupDescriptorSetLayout();
   SetupDescriptorSet();
+  SetupPipelines();
 
   BuildCommandBuffers();
   BuildDeferredCommandBuffer();
