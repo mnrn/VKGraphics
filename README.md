@@ -84,6 +84,17 @@ GUIの使用を少し変更したこともあり、細かいところは[移植�
 
 3つの情報からライティングを施した結果です。
 
+### スクリーンスペースアンビエントオクルージョン (SSAO)
+
+![SSAO](https://github.com/mnrn/ReVK/blob/main/Docs/Images/ssao.png)
+
+アンビエントオクルージョン(環境光遮蔽)をスクリーン空間上で考えて計算するシェーディング手法です。  
+Deferred Renderingで実装しましたが、Forward Renderingでも用いることは可能です。
+
+![SSAOOnly](https://github.com/mnrn/ReVK/blob/main/Docs/Images/ssao_only.png)
+
+SSAOシーンのみをレンダリングした場合です。
+
 ## 参考
 
 [OpenGL 4 Shading Language Cookbook - Third Edition](https://www.packtpub.com/product/opengl-4-shading-language-cookbook-third-edition/9781789342253)  
