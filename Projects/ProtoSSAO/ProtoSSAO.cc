@@ -34,17 +34,21 @@ void ProtoSSAO::OnPostInit() {
 
 void ProtoSSAO::OnPreDestroy() {
   vkDestroyPipeline(device, pipelines.lighting, nullptr);
+  vkDestroyPipeline(device, pipelines.blur, nullptr);
   vkDestroyPipeline(device, pipelines.ssao, nullptr);
   vkDestroyPipeline(device, pipelines.gBuffer, nullptr);
 
   vkDestroyPipelineLayout(device, pipelineLayouts.lighting, nullptr);
+  vkDestroyPipelineLayout(device, pipelineLayouts.blur, nullptr);
   vkDestroyPipelineLayout(device, pipelineLayouts.ssao, nullptr);
   vkDestroyPipelineLayout(device, pipelineLayouts.gBuffer, nullptr);
 
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.lighting, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.blur, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.ssao, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.gBuffer, nullptr);
 
+  frameBuffers.blur.Destroy(device);
   frameBuffers.ssao.Destroy(device);
   frameBuffers.gBuffer.Destroy(device);
 
@@ -59,8 +63,6 @@ void ProtoSSAO::OnPreDestroy() {
   models.floor.Destroy(device);
   models.teapot.Destroy(device);
 }
-
-void ProtoSSAO::OnUpdate(float) { UpdateUniformBuffers(); }
 
 void ProtoSSAO::ViewChanged() { UpdateUniformBuffers(); }
 
@@ -106,9 +108,9 @@ void ProtoSSAO::LoadAssets() {
 void ProtoSSAO::SetupDescriptorPool() {
   // APIに記述子の最大数を通知する必要があります。
   std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
-      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 12),
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16),
       Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      12),
+                                      16),
   };
 
   // グローバル記述子プールを生成します。
@@ -185,6 +187,9 @@ void ProtoSSAO::SetupDescriptorSet() {
     vkUpdateDescriptorSets(device,
                            static_cast<uint32_t>(writeDescriptorSets.size()),
                            writeDescriptorSets.data(), 0, nullptr);
+
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+    pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
   }
 
   // SSAO
@@ -245,6 +250,42 @@ void ProtoSSAO::SetupDescriptorSet() {
                            writeDescriptorSets.data(), 0, nullptr);
   }
 
+  // Blur
+  {
+    descriptorSetLayoutBindings = {
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+    };
+    descriptorSetLayoutCreateInfo =
+        Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
+                                    nullptr, &descriptorSetLayouts.blur));
+
+    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayouts.blur;
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
+                                           nullptr, &pipelineLayouts.blur));
+
+    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayouts.blur;
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                                             &descriptorSets.blur));
+
+    imageDescriptors = {
+        Initializer::DescriptorImageInfo(
+            frameBuffers.gBuffer.sampler, frameBuffers.ssao.attachments[0].view,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+    };
+    writeDescriptorSets = {
+        Initializer::WriteDescriptorSet(
+            descriptorSets.blur, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0,
+            &imageDescriptors[0]),
+    };
+    vkUpdateDescriptorSets(device,
+                           static_cast<uint32_t>(writeDescriptorSets.size()),
+                           writeDescriptorSets.data(), 0, nullptr);
+  }
+
   // Lighting
   {
     descriptorSetLayoutBindings = {
@@ -262,6 +303,9 @@ void ProtoSSAO::SetupDescriptorSet() {
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 4),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 5),
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -270,8 +314,6 @@ void ProtoSSAO::SetupDescriptorSet() {
                                     nullptr, &descriptorSetLayouts.lighting));
 
     pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayouts.lighting;
-    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-    pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
     VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
                                            nullptr, &pipelineLayouts.lighting));
 
@@ -293,8 +335,10 @@ void ProtoSSAO::SetupDescriptorSet() {
             frameBuffers.gBuffer.attachments[2].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            frameBuffers.gBuffer.sampler,
-            frameBuffers.ssao.attachments[0].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.ssao.attachments[0].view,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        Initializer::DescriptorImageInfo(
+            frameBuffers.gBuffer.sampler, frameBuffers.blur.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
     };
     writeDescriptorSets = {
@@ -313,6 +357,9 @@ void ProtoSSAO::SetupDescriptorSet() {
         Initializer::WriteDescriptorSet(
             descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             4, &imageDescriptors[3]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            5, &imageDescriptors[4]),
     };
     vkUpdateDescriptorSets(device,
                            static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -441,6 +488,26 @@ void ProtoSSAO::SetupPipelines() {
     vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
   }
 
+  // Blur pipeline
+  {
+    pipelineCreateInfo.renderPass = frameBuffers.blur.renderPass;
+    pipelineCreateInfo.layout = pipelineLayouts.blur;
+    shaderStages = {
+        CreateShader(device,
+                     pipelinesConfig["Blur"]["VertexShader"].get<std::string>(),
+                     VK_SHADER_STAGE_VERTEX_BIT),
+        CreateShader(
+            device,
+            pipelinesConfig["Blur"]["FragmentShader"].get<std::string>(),
+            VK_SHADER_STAGE_FRAGMENT_BIT),
+    };
+
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
+                                              &pipelineCreateInfo, nullptr,
+                                              &pipelines.blur));
+    vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+    vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+  }
 
   // G-Buffer pipeline
   {
@@ -555,6 +622,16 @@ void ProtoSSAO::PrepareOffscreenFramebuffer() {
 
     VK_CHECK_RESULT(frameBuffers.ssao.CreateRenderPass(device));
   }
+
+  // SSAO Blur
+  {
+    frameBuffers.blur.width = swapchain.extent.width;
+    frameBuffers.blur.height = swapchain.extent.height;
+
+    frameBuffers.blur.AddAttachment(device, attachmentCreateInfo);
+
+    VK_CHECK_RESULT(frameBuffers.blur.CreateRenderPass(device));
+  }
 }
 
 /**
@@ -592,7 +669,7 @@ void ProtoSSAO::PrepareUniformBuffers() {
   // SSAO
   {
     uboSSAO.radius = 0.55f;
-    uboSSAO.bias = 0.25f;
+    uboSSAO.bias = 0.1f;
     for (size_t i = 0; i < KERNEL_SIZE; i++) {
       glm::vec3 randDir = dist.OnHemisphere(engine);
       const float scale = static_cast<float>(i * i) /
@@ -622,7 +699,8 @@ void ProtoSSAO::PrepareUniformBuffers() {
   // Lighting
   {
     uboLighting.displayRenderTarget = 0;
-    uboLighting.ao = 2.0f;
+    uboLighting.useBlur = true;
+    uboLighting.ao = 8.0f;
   }
 
   UpdateUniformBuffers();
@@ -815,6 +893,41 @@ void ProtoSSAO::BuildCommandBuffers() {
       vkCmdEndRenderPass(drawCmdBuffers[i]);
     }
 
+    // Blur
+    {
+      std::vector<VkClearValue> clearValues(2);
+      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+      clearValues[1].depthStencil = {1.0f, 0};
+
+      renderPassBeginInfo.renderPass = frameBuffers.blur.renderPass;
+      renderPassBeginInfo.framebuffer = frameBuffers.blur.framebuffer;
+      renderPassBeginInfo.renderArea.extent.width = frameBuffers.blur.width;
+      renderPassBeginInfo.renderArea.extent.height = frameBuffers.blur.height;
+      renderPassBeginInfo.clearValueCount =
+          static_cast<uint32_t>(clearValues.size());
+      renderPassBeginInfo.pClearValues = clearValues.data();
+
+      vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+
+      VkViewport viewport = Initializer::Viewport(
+          static_cast<float>(frameBuffers.blur.width),
+          static_cast<float>(frameBuffers.blur.height), 0.0f, 1.0f);
+      vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+      VkRect2D scissor = Initializer::Rect2D(frameBuffers.blur.width,
+                                             frameBuffers.blur.height, 0, 0);
+      vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(
+          drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+          pipelineLayouts.blur, 0, 1, &descriptorSets.blur, 0, nullptr);
+      vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines.blur);
+      vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
+
+      vkCmdEndRenderPass(drawCmdBuffers[i]);
+    }
+
     // Lighting
     {
       std::array<VkClearValue, 2> clear{};
@@ -920,6 +1033,18 @@ void ProtoSSAO::OnUpdateUIOverlay() {
   if (uiOverlay.Combo("Display Render Target", &uboLighting.displayRenderTarget,
                       {"Final Result", "Only SSAO", "No SSAO", "Position",
                        "Normal", "Albedo"})) {
+    UpdateLightingUniformBuffer();
+  }
+  if (uiOverlay.Checkbox("Use Blur", &uboLighting.useBlur)) {
+    UpdateLightingUniformBuffer();
+  }
+  if (uiOverlay.SliderFloat("Sampling Radius", &uboSSAO.radius, 0.1f, 1.0f)) {
+    UpdateSSAOUniformBuffer();
+  }
+  if (uiOverlay.SliderFloat("Sampling Bias", &uboSSAO.bias, 0.0f, 1.0f)) {
+    UpdateSSAOUniformBuffer();
+  }
+  if (uiOverlay.SliderFloat("AO Parameterization", &uboLighting.ao, 1.0f, 10.0f)) {
     UpdateLightingUniformBuffer();
   }
 }

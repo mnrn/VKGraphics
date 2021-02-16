@@ -6,6 +6,7 @@ layout (binding = 1) uniform sampler2D PosTex;
 layout (binding = 2) uniform sampler2D NormTex;
 layout (binding = 3) uniform sampler2D AlbedoTex;
 layout (binding = 4) uniform sampler2D AOTex;
+layout (binding = 5) uniform sampler2D AOBlurTex;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -47,15 +48,17 @@ void main() {
     // G-Bufferから値を取得します。
     vec3 pos = texture(PosTex, UV).xyz;
     vec3 norm = texture(NormTex, UV).xyz;
-    vec4 albedo = texture(AlbedoTex, UV);
-    float ao = texture(AOTex, UV).r;
+    vec3 albedo = texture(AlbedoTex, UV).rgb;
+    float ao = ubo.UseBlur
+        ? texture(AOBlurTex, UV).r 
+        : texture(AOTex, UV).r;
 
     // aoのパラメータ化を行います。
     ao = pow(ao, ubo.AO);
 
     vec3 fragColor = vec3(0.0);
     for (int i = 0; i < ubo.LightsNum; i++) {
-        fragColor += AmbientDiffuseModel(pos, norm, albedo.rgb, ao, i);
+        fragColor += AmbientDiffuseModel(pos, norm, albedo, ao, i);
     }
     FragColor = vec4(fragColor, 1.0);
 }

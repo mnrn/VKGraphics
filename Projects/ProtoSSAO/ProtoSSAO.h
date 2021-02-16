@@ -15,7 +15,6 @@ class ProtoSSAO : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;
-  void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
   void LoadAssets();
@@ -93,37 +92,43 @@ private:
   struct {
     Buffer gBuffer;
     Buffer ssao;
+    Buffer blur;
     Buffer lighting;
   } uniformBuffers;
 
   struct {
     VkPipeline gBuffer;
     VkPipeline ssao;
+    VkPipeline blur;
     VkPipeline lighting;
   } pipelines;
 
   struct {
     VkPipelineLayout gBuffer;
     VkPipelineLayout ssao;
+    VkPipelineLayout blur;
     VkPipelineLayout lighting;
   } pipelineLayouts;
 
   struct {
     VkDescriptorSet gBuffer;
     VkDescriptorSet ssao;
+    VkDescriptorSet blur;
     VkDescriptorSet lighting;
-    const uint32_t maxSets = 3;
+    const uint32_t maxSets = 4;
   } descriptorSets;
 
   struct {
     VkDescriptorSetLayout gBuffer;
     VkDescriptorSetLayout ssao;
+    VkDescriptorSetLayout blur;
     VkDescriptorSetLayout lighting;
   } descriptorSetLayouts;
 
   struct {
     Framebuffer gBuffer;
     Framebuffer ssao;
+    Framebuffer blur;
   } frameBuffers;
 
   Camera camera{};
