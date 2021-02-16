@@ -1,5 +1,7 @@
 #version 450
 
+const float GAMMA = 2.2;
+
 layout (location = 0) in vec2 UV;
 
 layout (binding = 1) uniform sampler2D PosTex;
@@ -30,16 +32,8 @@ vec3 AmbientDiffuseModel(vec3 pos, vec3 norm, vec3 albedo, float ao, int idx) {
     float NoL = max(dot(norm, L), 0.0);
 
     switch (ubo.DisplayRenderTarget) {
-        case 1:
-            return vec3(ao);  
         case 2:
             return ubo.Lights[idx].Ld * albedo * NoL;
-        case 3:
-            return pos;
-        case 4:
-            return norm;
-        case 5:
-            return albedo;
         default:
             return amb + ubo.Lights[idx].Ld * albedo * NoL;
     }
@@ -59,6 +53,22 @@ void main() {
     vec3 fragColor = vec3(0.0);
     for (int i = 0; i < ubo.LightsNum; i++) {
         fragColor += AmbientDiffuseModel(pos, norm, albedo, ao, i);
+    }
+    fragColor = pow(fragColor, vec3(1.0 / GAMMA));
+
+    switch (ubo.DisplayRenderTarget) {
+        case 1:
+            fragColor = vec3(ao); 
+            break;
+        case 3:
+            fragColor = pos;
+            break;
+        case 4:
+            fragColor = norm;
+            break;
+        case 5:
+            fragColor = albedo;
+            break;
     }
     FragColor = vec4(fragColor, 1.0);
 }
