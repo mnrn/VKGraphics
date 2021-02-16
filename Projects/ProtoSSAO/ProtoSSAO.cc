@@ -27,12 +27,9 @@ void ProtoSSAO::OnPostInit() {
   SetupPipelines();
 
   BuildCommandBuffers();
-  BuildDeferredCommandBuffer();
 }
 
 void ProtoSSAO::OnPreDestroy() {
-  vkDestroySemaphore(device, offscreenSemaphore, nullptr);
-
   vkDestroyPipeline(device, pipelines.lighting, nullptr);
   vkDestroyPipeline(device, pipelines.gBuffer, nullptr);
 
@@ -41,7 +38,8 @@ void ProtoSSAO::OnPreDestroy() {
 
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.lighting, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.gBuffer, nullptr);
-  offscreenFramebuffer.Destroy(device);
+
+  frameBuffers.gBuffer.Destroy(device);
 
   uniformBuffers.lighting.Destroy(device);
   uniformBuffers.gBuffer.Destroy(device);
@@ -61,40 +59,6 @@ void ProtoSSAO::OnUpdate(float t) {
       camAngle + config["Camera"]["RotationSpeed"].get<float>() * deltaT,
       glm::two_pi<float>());
   UpdateUniformBuffers();
-}
-
-void ProtoSSAO::OnRender() {
-  VkBase::PrepareFrame();
-
-  // シーンレンダリングコマンドバッファはオフスクリーンのレンダリングが終了まで待機する必要があります
-  // これを確実にするために、オフスクリーンレンダリングが終了したときに通知される専用のオフスクリーン同期セマフォを使用します。
-  // これは実装が両方のコマンドバッファを同時に開始する可能性があるため必要になります。
-  // コマンドバッファがアプリによって送信された順序で実行される保証はありません。
-
-  // オフスクリーンレンダリング
-
-  // スワップチェインが終了するまで待機します。
-  submitInfo.pWaitSemaphores = &semaphores.presentComplete;
-  // オフスクリーンセマフォでシグナル準備します。
-  submitInfo.pSignalSemaphores = &offscreenSemaphore;
-
-  // Submit work
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &offscreenCmdBuffer;
-  VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-
-  // シーンレンダリング
-
-  // オフスクリーンセマフォを待機します。
-  submitInfo.pWaitSemaphores = &offscreenSemaphore;
-  // 描画完了セマフォでシグナル準備完了です。
-  submitInfo.pSignalSemaphores = &semaphores.renderComplete;
-
-  // Submit work
-  submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-  VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-
-  VkBase::SubmitFrame();
 }
 
 void ProtoSSAO::ViewChanged() { UpdateUniformBuffers(); }
@@ -255,13 +219,13 @@ void ProtoSSAO::SetupDescriptorSet() {
 
     imageDescriptors = {
         Initializer::DescriptorImageInfo(
-            offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[0].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.gBuffer.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[1].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.gBuffer.attachments[1].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            offscreenFramebuffer.sampler, offscreenFramebuffer.attachments[2].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.gBuffer.attachments[2].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
     };
     writeDescriptorSets = {
@@ -401,7 +365,7 @@ void ProtoSSAO::SetupPipelines() {
       VK_SHADER_STAGE_FRAGMENT_BIT);
 
   // レンダーパスは別にします。
-  pipelineCreateInfo.renderPass = offscreenFramebuffer.renderPass;
+  pipelineCreateInfo.renderPass = frameBuffers.gBuffer.renderPass;
   pipelineCreateInfo.layout = pipelineLayouts.gBuffer;
 
   // カラーアタッチメントに何も描画しないようにします。
@@ -430,39 +394,39 @@ void ProtoSSAO::SetupPipelines() {
  * @brief オフスクリーンレンダリング用に新しいフレームバッファを用意します。
  */
 void ProtoSSAO::PrepareOffscreenFramebuffer() {
-  offscreenFramebuffer.width = swapchain.extent.width;
-  offscreenFramebuffer.height = swapchain.extent.height;
+  frameBuffers.gBuffer.width = swapchain.extent.width;
+  frameBuffers.gBuffer.height = swapchain.extent.height;
 
   AttachmentCreateInfo attachmentCreateInfo{};
-  attachmentCreateInfo.width = offscreenFramebuffer.width;
-  attachmentCreateInfo.height = offscreenFramebuffer.height;
+  attachmentCreateInfo.width = frameBuffers.gBuffer.width;
+  attachmentCreateInfo.height = frameBuffers.gBuffer.height;
   attachmentCreateInfo.layerCount = 1;
   attachmentCreateInfo.usage =
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-  attachmentCreateInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+  attachmentCreateInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 
   // POSITION (World Space)
-  offscreenFramebuffer.AddAttachment(device, attachmentCreateInfo);
+  frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
   // NORMAL (World Space)
-  offscreenFramebuffer.AddAttachment(device, attachmentCreateInfo);
+  frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
   // ALBEDO (Color)
   attachmentCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-  offscreenFramebuffer.AddAttachment(device, attachmentCreateInfo);
+  frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
   // Depth attachment
   attachmentCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
   attachmentCreateInfo.format = device.FindSupportedDepthFormat();
-  offscreenFramebuffer.AddAttachment(device, attachmentCreateInfo);
+  frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
   // カラーアタッチメントからサンプラーを生成します。
-  VK_CHECK_RESULT(offscreenFramebuffer.CreateSampler(
+  VK_CHECK_RESULT(frameBuffers.gBuffer.CreateSampler(
       device, VK_FILTER_NEAREST, VK_FILTER_NEAREST,
       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE));
 
   // フレームバッファ用のデフォルトのレンダーパスを生成します。
-  VK_CHECK_RESULT(offscreenFramebuffer.CreateRenderPass(device));
+  VK_CHECK_RESULT(frameBuffers.gBuffer.CreateRenderPass(device));
 }
 
 /**
@@ -502,201 +466,184 @@ void ProtoSSAO::PrepareUniformBuffers() {
 void ProtoSSAO::BuildCommandBuffers() {
   VkCommandBufferBeginInfo commandBufferBeginInfo =
       Initializer::CommandBufferBeginInfo();
-
-  // LoadOpをclearに設定して　すべてのフレームバッファにclear値を設定します。
-  // サブパスの開始時にクリアされる2つのアタッチメント(カラーとデプス)を使用するため、両方にクリア値を設定する必要があります。
-  std::array<VkClearValue, 2> clear{};
-  clear[0].color = {{0.1f, 0.1f, 0.1f, 1.0f}};
-  clear[1].depthStencil = {1.0f, 0};
-
-  VkRenderPassBeginInfo renderPassBeginInfo =
-      Initializer::RenderPassBeginInfo();
-  renderPassBeginInfo.renderPass = renderPass;
-  renderPassBeginInfo.renderArea.offset.x = 0;
-  renderPassBeginInfo.renderArea.offset.y = 0;
-  renderPassBeginInfo.renderArea.extent.width = swapchain.extent.width;
-  renderPassBeginInfo.renderArea.extent.height = swapchain.extent.height;
-  renderPassBeginInfo.clearValueCount = 2;
-  renderPassBeginInfo.pClearValues = clear.data();
-
+  
   for (size_t i = 0; i < drawCmdBuffers.size(); i++) {
-    // ターゲットフレームバッファを設定します。
-    renderPassBeginInfo.framebuffer = framebuffers[i];
-    VK_CHECK_RESULT(
-        vkBeginCommandBuffer(drawCmdBuffers[i], &commandBufferBeginInfo));
+    
+    VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &commandBufferBeginInfo));
 
-    // デフォルトのレンダーパス設定で指定された最初のサブパスを開始します。
-    // これにより、色と奥行きのアタッチメントがクリアされます。
-    vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
 
-    // ビューポートとシザーの更新
-    VkViewport viewport = Initializer::Viewport(
-        static_cast<float>(swapchain.extent.width),
-        static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
-    vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-    VkRect2D scissor = Initializer::Rect2D(swapchain.extent.width,
-                                           swapchain.extent.height, 0, 0);
-    vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+    VkRenderPassBeginInfo renderPassBeginInfo =
+        Initializer::RenderPassBeginInfo();
 
-    // 記述子セットとパイプラインのバインド
-    vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayouts.lighting, 0, 1,
-                            &descriptorSets.lighting, 0, nullptr);
-    vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipelines.lighting);
+    // Fill G-Buffer
+    {
+      // フラグメントシェーダーで使用するすべてのアタッチメントをこの値でクリアします。
+      std::array<VkClearValue, 4> clearValues{};
+      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[1].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[2].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[3].depthStencil = {1.0f, 0};
+      
+      renderPassBeginInfo.renderPass = frameBuffers.gBuffer.renderPass;
+      renderPassBeginInfo.framebuffer = frameBuffers.gBuffer.framebuffer;
+      renderPassBeginInfo.renderArea.extent.width = frameBuffers.gBuffer.width;
+      renderPassBeginInfo.renderArea.extent.height = frameBuffers.gBuffer.height;
+      renderPassBeginInfo.clearValueCount =
+          static_cast<uint32_t>(clearValues.size());
+      renderPassBeginInfo.pClearValues = clearValues.data();
 
-    vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
+      vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
 
-    DrawUI(drawCmdBuffers[i]);
+      VkViewport viewport = Initializer::Viewport(
+          static_cast<float>(frameBuffers.gBuffer.width),
+          static_cast<float>(frameBuffers.gBuffer.height), 0.0f, 1.0f);
+      vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+      VkRect2D scissor = Initializer::Rect2D(frameBuffers.gBuffer.width,
+                                             frameBuffers.gBuffer.height, 0, 0);
+      vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-    vkCmdEndRenderPass(drawCmdBuffers[i]);
+      vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines.gBuffer);
+      vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              pipelineLayouts.gBuffer, 0, 1,
+                              &descriptorSets.gBuffer, 0, nullptr);
+      VkDeviceSize offsets[] = {0};
+
+      // Teapot
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.teapot.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.teapot.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto &teapot = config["Teapot"];
+        const auto scale = glm::vec3(teapot["Scale"].get<float>());
+        const auto trans = glm::vec3(teapot["Position"][0].get<float>(),
+                                     teapot["Position"][1].get<float>(),
+                                     teapot["Position"][2].get<float>());
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model =
+            glm::rotate(model, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 0;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.teapot.indexCount, 1, 0, 0, 0);
+      }
+
+      // Floor
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.floor.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto scale = glm::vec3(4.0f);
+        const auto trans = glm::vec3(0.0f, 0.0f, 0.0f);
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 1;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0, 0);
+      }
+
+      // Wall1
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.floor.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto scale = glm::vec3(4.0f);
+        const auto trans = glm::vec3(0.0f, 0.0f, -2.0f);
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model =
+            glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 2;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0, 0);
+      }
+
+      // Wall2
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.floor.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto scale = glm::vec3(4.0f);
+        const auto trans = glm::vec3(-2.0f, 0.0f, 0.0f);
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model =
+            glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0, 0.0f));
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 2;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0, 0);
+      }
+
+      vkCmdEndRenderPass(drawCmdBuffers[i]);
+    }
+
+    // Lighting
+    {
+      std::array<VkClearValue, 2> clear{};
+      clear[0].color = {{0.1f, 0.1f, 0.1f, 1.0f}};
+      clear[1].depthStencil = {1.0f, 0};
+      
+      renderPassBeginInfo.framebuffer = framebuffers[i];
+      renderPassBeginInfo.renderPass = renderPass;
+      renderPassBeginInfo.renderArea.extent.width = swapchain.extent.width;
+      renderPassBeginInfo.renderArea.extent.height = swapchain.extent.height;
+
+      // デフォルトのレンダーパス設定で指定された最初のサブパスを開始します。
+      // これにより、色と奥行きのアタッチメントがクリアされます。
+      vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+
+      // ビューポートとシザーの更新
+      VkViewport viewport = Initializer::Viewport(
+          static_cast<float>(swapchain.extent.width),
+          static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
+      vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+      VkRect2D scissor = Initializer::Rect2D(swapchain.extent.width,
+                                             swapchain.extent.height, 0, 0);
+      vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+
+      // 記述子セットとパイプラインのバインド
+      vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              pipelineLayouts.lighting, 0, 1,
+                              &descriptorSets.lighting, 0, nullptr);
+      vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines.lighting);
+
+      vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
+
+      DrawUI(drawCmdBuffers[i]);
+
+      vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+    }
 
     // レンダーパスを終了すると、フレームバッファのカラーアタッチメントに移行する暗黙のバリアが追加されます。
     VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
   }
 }
 
-void ProtoSSAO::BuildDeferredCommandBuffer() {
-  if (offscreenCmdBuffer == VK_NULL_HANDLE) {
-    offscreenCmdBuffer =
-        device.CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
-  }
-  // オフスクリーンレンダリングと同期を行うために使用するセマフォを生成します。
-  VkSemaphoreCreateInfo semaphoreCreateInfo =
-      Initializer::SemaphoreCreateInfo();
-  VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
-                                    &offscreenSemaphore));
-
-  VkCommandBufferBeginInfo commandBufferBeginInfo =
-      Initializer::CommandBufferBeginInfo();
-
-  // フラグメントシェーダーで使用するすべてのアタッチメントをこの値でクリアします。
-  std::array<VkClearValue, 4> clearValues{};
-  clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
-  clearValues[1].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
-  clearValues[2].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
-  clearValues[3].depthStencil = {1.0f, 0};
-
-  VkRenderPassBeginInfo renderPassBeginInfo =
-      Initializer::RenderPassBeginInfo();
-  renderPassBeginInfo.renderPass = offscreenFramebuffer.renderPass;
-  renderPassBeginInfo.framebuffer = offscreenFramebuffer.framebuffer;
-  renderPassBeginInfo.renderArea.extent.width = offscreenFramebuffer.width;
-  renderPassBeginInfo.renderArea.extent.height = offscreenFramebuffer.height;
-  renderPassBeginInfo.clearValueCount =
-      static_cast<uint32_t>(clearValues.size());
-  renderPassBeginInfo.pClearValues = clearValues.data();
-
-  VK_CHECK_RESULT(
-      vkBeginCommandBuffer(offscreenCmdBuffer, &commandBufferBeginInfo));
-  vkCmdBeginRenderPass(offscreenCmdBuffer, &renderPassBeginInfo,
-                       VK_SUBPASS_CONTENTS_INLINE);
-
-  VkViewport viewport = Initializer::Viewport(
-      static_cast<float>(offscreenFramebuffer.width),
-      static_cast<float>(offscreenFramebuffer.height), 0.0f, 1.0f);
-  vkCmdSetViewport(offscreenCmdBuffer, 0, 1, &viewport);
-  VkRect2D scissor = Initializer::Rect2D(offscreenFramebuffer.width,
-                                         offscreenFramebuffer.height, 0, 0);
-  vkCmdSetScissor(offscreenCmdBuffer, 0, 1, &scissor);
-
-  vkCmdBindPipeline(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipelines.gBuffer);
-  vkCmdBindDescriptorSets(offscreenCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipelineLayouts.gBuffer, 0, 1,
-                          &descriptorSets.gBuffer, 0, nullptr);
-  VkDeviceSize offsets[] = {0};
-
-  // Teapot
-  {
-    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
-                           &models.teapot.vertices.buffer, offsets);
-    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.teapot.indices.buffer, 0,
-                         VK_INDEX_TYPE_UINT32);
-    const auto &teapot = config["Teapot"];
-    const auto scale = glm::vec3(teapot["Scale"].get<float>());
-    const auto trans = glm::vec3(teapot["Position"][0].get<float>(),
-                                 teapot["Position"][1].get<float>(),
-                                 teapot["Position"][2].get<float>());
-    auto model = glm::translate(glm::mat4(1.0f), trans);
-    model =
-        glm::rotate(model, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::scale(model, scale);
-    pushConsts.model = model;
-    pushConsts.tex = 0;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
-                       VK_SHADER_STAGE_VERTEX_BIT |
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConsts), &pushConsts);
-    vkCmdDrawIndexed(offscreenCmdBuffer, models.teapot.indexCount, 1, 0, 0, 0);
-  }
-
-  // Floor
-  {
-    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
-                           &models.floor.vertices.buffer, offsets);
-    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
-                         VK_INDEX_TYPE_UINT32);
-    const auto scale = glm::vec3(4.0f);
-    const auto trans = glm::vec3(0.0f, 0.0f, 0.0f);
-    auto model = glm::translate(glm::mat4(1.0f), trans);
-    model = glm::scale(model, scale);
-    pushConsts.model = model;
-    pushConsts.tex = 1;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
-                       VK_SHADER_STAGE_VERTEX_BIT |
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConsts), &pushConsts);
-    vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
-  }
-
-  // Wall1
-  {
-    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
-                           &models.floor.vertices.buffer, offsets);
-    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
-                         VK_INDEX_TYPE_UINT32);
-    const auto scale = glm::vec3(4.0f);
-    const auto trans = glm::vec3(0.0f, 0.0f, -2.0f);
-    auto model = glm::translate(glm::mat4(1.0f), trans);
-    model =
-        glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    model = glm::scale(model, scale);
-    pushConsts.model = model;
-    pushConsts.tex = 2;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
-                       VK_SHADER_STAGE_VERTEX_BIT |
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConsts), &pushConsts);
-    vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
-  }
-
-  // Wall2
-  {
-    vkCmdBindVertexBuffers(offscreenCmdBuffer, 0, 1,
-                           &models.floor.vertices.buffer, offsets);
-    vkCmdBindIndexBuffer(offscreenCmdBuffer, models.floor.indices.buffer, 0,
-                         VK_INDEX_TYPE_UINT32);
-    const auto scale = glm::vec3(4.0f);
-    const auto trans = glm::vec3(-2.0f, 0.0f, 0.0f);
-    auto model = glm::translate(glm::mat4(1.0f), trans);
-    model =
-        glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0, 0.0f));
-    model = glm::scale(model, scale);
-    pushConsts.model = model;
-    pushConsts.tex = 2;
-    vkCmdPushConstants(offscreenCmdBuffer, pipelineLayouts.gBuffer,
-                       VK_SHADER_STAGE_VERTEX_BIT |
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConsts), &pushConsts);
-    vkCmdDrawIndexed(offscreenCmdBuffer, models.floor.indexCount, 1, 0, 0, 0);
-  }
-
-  vkCmdEndRenderPass(offscreenCmdBuffer);
-  VK_CHECK_RESULT(vkEndCommandBuffer(offscreenCmdBuffer));
-}
 
 //*-----------------------------------------------------------------------------
 // Update

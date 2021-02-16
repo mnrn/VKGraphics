@@ -15,7 +15,6 @@ class ProtoSSAO : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;
-  void OnRender() override;
   void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
@@ -32,8 +31,6 @@ public:
   void SetupPipelines();
 
   void BuildCommandBuffers() override;
-
-  void BuildDeferredCommandBuffer();
 
   void ViewChanged() override;
 
@@ -107,10 +104,9 @@ private:
     VkDescriptorSetLayout lighting;
   } descriptorSetLayouts;
 
-  Framebuffer offscreenFramebuffer;
-
-  VkCommandBuffer offscreenCmdBuffer = VK_NULL_HANDLE;
-  VkSemaphore offscreenSemaphore = VK_NULL_HANDLE;
+  struct {
+    Framebuffer gBuffer;
+  } frameBuffers;
 
   Camera camera{};
 
