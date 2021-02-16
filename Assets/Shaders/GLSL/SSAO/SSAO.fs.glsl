@@ -6,15 +6,12 @@ layout (binding = 0) uniform sampler2D PositionDepthTex;
 layout (binding = 1) uniform sampler2D NormalTex;
 layout (binding = 2) uniform sampler2D RandRotTex;
 
-layout (binding = 3) uniform Kernel {
+layout (binding = 3) uniform UniformBufferObject {
     vec4 Samples[KERNEL_SIZE];
+    mat4 Proj;
     float Radius;
     float Bias;
-} uboKernel;
-
-layout (binding = 4) uniform Matrices {
-    mat4 Proj;
-} uboMatrices;
+} ubo;
 
 layout (location = 0) in vec2 UV;
 
@@ -37,17 +34,17 @@ void main() {
     // サンプリングを行い、AO(環境遮蔽)の係数値を計算します。
     float occ = 0.0;
     for (int i = 0; i < KERNEL_SIZE; i++) {
-        vec3 samplePos = pos + uboKernel.Radius * (TBN * uboKernel.Samples[i].xyz);
+        vec3 samplePos = pos + ubo.Radius * (TBN * ubo.Samples[i].xyz);
 
         // カメラ座標->クリップ座標->正規化デバイス座標->テクスチャ座標
-        vec4 p = uboMatrices.Proj * vec4(samplePos, 1.0);
+        vec4 p = ubo.Proj * vec4(samplePos, 1.0);
         p *= 1.0 / p.w;
         p.xyz = p.xyz * 0.5 + 0.5;
 
         // サンプル点と比較し、遮蔽されるようであれば環境遮蔽係数に加算します。
         float surfZ = texture(PositionDepthTex, p.xy).z;
-        float range = smoothstep(0.0, 1.0, uboKernel.Radius / abs(pos.z - surfZ));
-        occ += (surfZ >= samplePos.z + uboKernel.Bias ? 1.0 : 0.0) * range;
+        float range = smoothstep(0.0, 1.0, ubo.Radius / abs(pos.z - surfZ));
+        occ += (surfZ >= samplePos.z + ubo.Bias ? 1.0 : 0.0) * range;
     }
     occ = 1.0 - (occ / float(KERNEL_SIZE));
     FragColor = occ;

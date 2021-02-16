@@ -1,12 +1,12 @@
 /**
- * @brief Physically based rendering basics
+ * @brief Screen Space Ambient Occlusion
  */
 
 #include <memory>
 
 #include "App.h"
-#include "SSAO.h"
 #include "Json.h"
+#include "SSAO.h"
 
 int main() {
   const auto config = Json::Parse("./Configs/SceneSSAO.json");

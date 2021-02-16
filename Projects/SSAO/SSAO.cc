@@ -29,14 +29,13 @@ void SSAO::OnPostInit() {
   SetupDescriptorSet();
   SetupPipelines();
 
-  UpdateUIOverlay();
   BuildCommandBuffers();
 }
 
 void SSAO::OnPreDestroy() {
   vkDestroyPipeline(device, pipelines.lighting, nullptr);
-  vkDestroyPipeline(device, pipelines.ssao, nullptr);
   vkDestroyPipeline(device, pipelines.blur, nullptr);
+  vkDestroyPipeline(device, pipelines.ssao, nullptr);
   vkDestroyPipeline(device, pipelines.gBuffer, nullptr);
 
   vkDestroyPipelineLayout(device, pipelineLayouts.lighting, nullptr);
@@ -49,23 +48,21 @@ void SSAO::OnPreDestroy() {
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.ssao, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.gBuffer, nullptr);
 
-  vkDestroySampler(device, colorSampler, nullptr);
-
   frameBuffers.blur.Destroy(device);
   frameBuffers.ssao.Destroy(device);
   frameBuffers.gBuffer.Destroy(device);
 
+  uniformBuffers.lighting.Destroy(device);
   uniformBuffers.ssao.Destroy(device);
-  uniformBuffers.ssaoKernel.Destroy(device);
-  uniformBuffers.scene.Destroy(device);
+  uniformBuffers.gBuffer.Destroy(device);
 
   textures.noise.Destroy(device);
+  textures.wall.Destroy(device);
+  textures.floor.Destroy(device);
 
   models.floor.Destroy(device);
   models.teapot.Destroy(device);
 }
-
-void SSAO::OnUpdate(float) {}
 
 void SSAO::ViewChanged() { UpdateUniformBuffers(); }
 
@@ -85,15 +82,22 @@ void SSAO::LoadAssets() {
                                config["Teapot"]["Model"].get<std::string>(),
                                queue, vertexLayout, modelCreateInfo);
   }
+
   // Floor
   {
     const auto &floor = config["Floor"];
-    modelCreateInfo.color = glm::vec3(floor["Color"][0].get<float>(),
-                                      floor["Color"][1].get<float>(),
-                                      floor["Color"][2].get<float>());
+    modelCreateInfo.uvscale = glm::vec3(4.0f, 4.0f, 4.0f);
     models.floor.LoadFromFile(device,
                               config["Floor"]["Model"].get<std::string>(),
                               queue, vertexLayout, modelCreateInfo);
+    textures.floor.Load(device, floor["Texture"].get<std::string>(), queue);
+  }
+
+  // Wall
+  {
+    const auto &wall = config["Wall"];
+    modelCreateInfo.uvscale = glm::vec3(16.0f, 16.0f, 16.0f);
+    textures.wall.Load(device, wall["Texture"].get<std::string>(), queue);
   }
 }
 
@@ -104,22 +108,22 @@ void SSAO::LoadAssets() {
 void SSAO::SetupDescriptorPool() {
   // APIに記述子の最大数を通知する必要があります。
   std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
-      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10),
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16),
       Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      12),
+                                      16),
   };
 
   // グローバル記述子プールを生成します。
   VkDescriptorPoolCreateInfo descriptorPoolInfo =
       Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes,
-                                            descriptorSets.count);
+                                            descriptorSets.maxSets);
 
   VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
                                          &descriptorPool));
 }
 
 /**
- * @brief 使用される記述子を設定します。<br>
+ * @brief 使用される記述子のレイアウトを設定します。<br>
  * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
  * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
  */
@@ -138,11 +142,15 @@ void SSAO::SetupDescriptorSet() {
     descriptorSetLayoutBindings = {
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-        /*
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 1),
-        */
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 2),
+        Initializer::DescriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 3),
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -151,6 +159,14 @@ void SSAO::SetupDescriptorSet() {
                                     nullptr, &descriptorSetLayouts.gBuffer));
 
     pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayouts.gBuffer;
+    std::vector<VkPushConstantRange> pushConstantRanges = {
+        Initializer::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT |
+                                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                                       sizeof(pushConsts), 0),
+    };
+    pipelineLayoutCreateInfo.pushConstantRangeCount =
+        static_cast<uint32_t>(pushConstantRanges.size());
+    pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
     VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
                                            nullptr, &pipelineLayouts.gBuffer));
 
@@ -160,11 +176,20 @@ void SSAO::SetupDescriptorSet() {
     writeDescriptorSets = {
         Initializer::WriteDescriptorSet(descriptorSets.gBuffer,
                                         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-                                        &uniformBuffers.scene.descriptor),
+                                        &uniformBuffers.gBuffer.descriptor),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.gBuffer, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            1, &textures.floor.descriptor),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.gBuffer, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            2, &textures.wall.descriptor),
     };
     vkUpdateDescriptorSets(device,
                            static_cast<uint32_t>(writeDescriptorSets.size()),
                            writeDescriptorSets.data(), 0, nullptr);
+
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+    pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
   }
 
   // SSAO
@@ -181,8 +206,6 @@ void SSAO::SetupDescriptorSet() {
             VK_SHADER_STAGE_FRAGMENT_BIT, 2),
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 3),
-        Initializer::DescriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -200,10 +223,12 @@ void SSAO::SetupDescriptorSet() {
 
     imageDescriptors = {
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.gBuffer.attachments[0].view,
+            frameBuffers.gBuffer.sampler,
+            frameBuffers.gBuffer.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.gBuffer.attachments[1].view,
+            frameBuffers.gBuffer.sampler,
+            frameBuffers.gBuffer.attachments[1].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
     };
     writeDescriptorSets = {
@@ -218,9 +243,6 @@ void SSAO::SetupDescriptorSet() {
             &textures.noise.descriptor),
         Initializer::WriteDescriptorSet(descriptorSets.ssao,
                                         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3,
-                                        &uniformBuffers.ssaoKernel.descriptor),
-        Initializer::WriteDescriptorSet(descriptorSets.ssao,
-                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4,
                                         &uniformBuffers.ssao.descriptor),
     };
     vkUpdateDescriptorSets(device,
@@ -251,7 +273,7 @@ void SSAO::SetupDescriptorSet() {
 
     imageDescriptors = {
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.ssao.attachments[0].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.ssao.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
     };
     writeDescriptorSets = {
@@ -264,12 +286,11 @@ void SSAO::SetupDescriptorSet() {
                            writeDescriptorSets.data(), 0, nullptr);
   }
 
-  // Composition + Lighting
+  // Lighting
   {
     descriptorSetLayoutBindings = {
         Initializer::DescriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 1),
@@ -283,7 +304,8 @@ void SSAO::SetupDescriptorSet() {
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 4),
         Initializer::DescriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 5),
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 5),
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -301,40 +323,43 @@ void SSAO::SetupDescriptorSet() {
 
     imageDescriptors = {
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.gBuffer.attachments[0].view,
+            frameBuffers.gBuffer.sampler,
+            frameBuffers.gBuffer.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.gBuffer.attachments[1].view,
+            frameBuffers.gBuffer.sampler,
+            frameBuffers.gBuffer.attachments[1].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.gBuffer.attachments[2].view,
+            frameBuffers.gBuffer.sampler,
+            frameBuffers.gBuffer.attachments[2].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.ssao.attachments[0].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.ssao.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
         Initializer::DescriptorImageInfo(
-            colorSampler, frameBuffers.blur.attachments[0].view,
+            frameBuffers.gBuffer.sampler, frameBuffers.blur.attachments[0].view,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
     };
     writeDescriptorSets = {
-        Initializer::WriteDescriptorSet(
-            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            0, &imageDescriptors[0]),
-        Initializer::WriteDescriptorSet(
-            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            1, &imageDescriptors[1]),
-        Initializer::WriteDescriptorSet(
-            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            2, &imageDescriptors[2]),
-        Initializer::WriteDescriptorSet(
-            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            3, &imageDescriptors[3]),
-        Initializer::WriteDescriptorSet(
-            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            4, &imageDescriptors[4]),
         Initializer::WriteDescriptorSet(descriptorSets.lighting,
-                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 5,
-                                        &uniformBuffers.ssao.descriptor),
+                                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+                                        &uniformBuffers.lighting.descriptor),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            1, &imageDescriptors[0]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            2, &imageDescriptors[1]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            3, &imageDescriptors[2]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            4, &imageDescriptors[3]),
+        Initializer::WriteDescriptorSet(
+            descriptorSets.lighting, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            5, &imageDescriptors[4]),
     };
     vkUpdateDescriptorSets(device,
                            static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -422,15 +447,16 @@ void SSAO::SetupPipelines() {
   VkPipelineVertexInputStateCreateInfo emptyVertexInputState =
       Initializer::PipelineVertexInputStateCreateInfo();
   pipelineCreateInfo.pVertexInputState = &emptyVertexInputState;
+  // Lighting pipeline
+  {
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
+                                              &pipelineCreateInfo, nullptr,
+                                              &pipelines.lighting));
+    vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+    vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+  }
 
-  // Final Composition + Lighting Pipeline
-  VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
-                                            &pipelineCreateInfo, nullptr,
-                                            &pipelines.lighting));
-  vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
-  vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
-
-  // SSAO Generation Pipeline
+  // SSAO pipeline
   {
     pipelineCreateInfo.renderPass = frameBuffers.ssao.renderPass;
     pipelineCreateInfo.layout = pipelineLayouts.ssao;
@@ -462,7 +488,7 @@ void SSAO::SetupPipelines() {
     vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
   }
 
-  // SSAO Blur Pipeline
+  // Blur pipeline
   {
     pipelineCreateInfo.renderPass = frameBuffers.blur.renderPass;
     pipelineCreateInfo.layout = pipelineLayouts.blur;
@@ -483,7 +509,7 @@ void SSAO::SetupPipelines() {
     vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
   }
 
-  // Fill G-Buffer Pipeline
+  // G-Buffer pipeline
   {
     std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
         Initializer::VertexInputBindingDescription(0, vertexLayout.Stride(),
@@ -493,15 +519,16 @@ void SSAO::SetupPipelines() {
         // location = 0 : position
         Initializer::VertexInputAttributeDescription(
             0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
-        // location = 1 : color
+        // location = 1 : normal
         Initializer::VertexInputAttributeDescription(
             0, 1, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)),
-        // location = 2 : normal
+        // location = 2 : color
         Initializer::VertexInputAttributeDescription(
             0, 2, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)),
-        // location = 3 uv
+        // location = 3 : uv
         Initializer::VertexInputAttributeDescription(
-            0, 3, VK_FORMAT_R32G32_SFLOAT, 9 * sizeof(float))};
+            0, 3, VK_FORMAT_R32G32_SFLOAT, 9 * sizeof(float)),
+    };
     VkPipelineVertexInputStateCreateInfo vertexInputState =
         Initializer::PipelineVertexInputStateCreateInfo(vertexInputBindings,
                                                         vertexInputAttributes);
@@ -514,6 +541,7 @@ void SSAO::SetupPipelines() {
         pipelinesConfig["G-Buffer"]["FragmentShader"].get<std::string>(),
         VK_SHADER_STAGE_FRAGMENT_BIT);
 
+    // レンダーパスは別にします。
     pipelineCreateInfo.renderPass = frameBuffers.gBuffer.renderPass;
     pipelineCreateInfo.layout = pipelineLayouts.gBuffer;
 
@@ -544,29 +572,24 @@ void SSAO::SetupPipelines() {
  * @brief オフスクリーンレンダリング用に新しいフレームバッファを用意します。
  */
 void SSAO::PrepareOffscreenFramebuffer() {
-  frameBuffers.gBuffer.width = swapchain.extent.width;
-  frameBuffers.gBuffer.height = swapchain.extent.height;
-  frameBuffers.ssao.width = swapchain.extent.width;
-  frameBuffers.ssao.height = swapchain.extent.height;
-  frameBuffers.blur.width = swapchain.extent.width;
-  frameBuffers.blur.height = swapchain.extent.height;
 
   AttachmentCreateInfo attachmentCreateInfo{};
   attachmentCreateInfo.width = swapchain.extent.width;
-  attachmentCreateInfo.height = swapchain.extent.width;
+  attachmentCreateInfo.height = swapchain.extent.height;
   attachmentCreateInfo.layerCount = 1;
 
   // G-Buffer
   {
+    frameBuffers.gBuffer.width = swapchain.extent.width;
+    frameBuffers.gBuffer.height = swapchain.extent.height;
+
     attachmentCreateInfo.usage =
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    // POSITION (World Space)
     attachmentCreateInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    // POSITION (World Space)
     frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
     // NORMAL (World Space)
-    attachmentCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
     frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
     // ALBEDO (Color)
@@ -578,11 +601,20 @@ void SSAO::PrepareOffscreenFramebuffer() {
     attachmentCreateInfo.format = device.FindSupportedDepthFormat();
     frameBuffers.gBuffer.AddAttachment(device, attachmentCreateInfo);
 
+    // カラーアタッチメントからサンプラーを生成します。
+    VK_CHECK_RESULT(frameBuffers.gBuffer.CreateSampler(
+        device, VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE));
+
+    // フレームバッファ用のデフォルトのレンダーパスを生成します。
     VK_CHECK_RESULT(frameBuffers.gBuffer.CreateRenderPass(device));
   }
 
   // SSAO
   {
+    frameBuffers.ssao.width = swapchain.extent.width;
+    frameBuffers.ssao.height = swapchain.extent.height;
+
     attachmentCreateInfo.usage =
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     attachmentCreateInfo.format = VK_FORMAT_R8_UNORM;
@@ -593,18 +625,13 @@ void SSAO::PrepareOffscreenFramebuffer() {
 
   // SSAO Blur
   {
+    frameBuffers.blur.width = swapchain.extent.width;
+    frameBuffers.blur.height = swapchain.extent.height;
+
     frameBuffers.blur.AddAttachment(device, attachmentCreateInfo);
 
     VK_CHECK_RESULT(frameBuffers.blur.CreateRenderPass(device));
   }
-
-  // すべてのカラーアタッチメントでこのサンプラーを使用します。
-  CreateSampler(device, colorSampler, VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-                VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL,
-                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                VK_SAMPLER_MIPMAP_MODE_LINEAR, 0.0f, 1.0f);
 }
 
 /**
@@ -615,52 +642,46 @@ void SSAO::PrepareOffscreenFramebuffer() {
  */
 void SSAO::PrepareUniformBuffers() {
   VK_CHECK_RESULT(
-      uniformBuffers.scene.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                  sizeof(uboScene), &uboScene));
+      uniformBuffers.gBuffer.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                    sizeof(uboGBuffer), &uboGBuffer));
+  VK_CHECK_RESULT(uniformBuffers.gBuffer.Map(device));
 
   VK_CHECK_RESULT(
       uniformBuffers.ssao.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                  sizeof(uboSSAO), &uboSSAO));
+  VK_CHECK_RESULT(uniformBuffers.ssao.Map(device));
 
-  uboSSAO.displayRenderTarget = 0;
-  uboSSAO.useBlur = true;
-  uboSSAO.ao = 8.0f;
-
-  UpdateUniformBuffers();
+  VK_CHECK_RESULT(
+      uniformBuffers.lighting.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     sizeof(uboLighting), &uboLighting));
+  VK_CHECK_RESULT(uniformBuffers.lighting.Map(device));
 
   std::random_device rd;
   std::mt19937 engine(rd());
   UniformDistribution dist;
 
-  // Kernel
+  // SSAO
   {
-    uboKernel.radius = 0.5f;
-    uboKernel.bias = 0.25f;
+    uboSSAO.radius = 0.5f;
+    uboSSAO.bias = 0.025f;
     for (size_t i = 0; i < KERNEL_SIZE; i++) {
       glm::vec3 randDir = dist.OnHemisphere(engine);
       const float scale = static_cast<float>(i * i) /
                           static_cast<float>(KERNEL_SIZE * KERNEL_SIZE);
       randDir *= glm::mix(0.1f, 1.0f, scale);
 
-      uboKernel.kernel[i].x = randDir.x;
-      uboKernel.kernel[i].y = randDir.y;
-      uboKernel.kernel[i].z = randDir.z;
-      uboKernel.kernel[i].w = 0.0f;
+      uboSSAO.kernel[i].x = randDir.x;
+      uboSSAO.kernel[i].y = randDir.y;
+      uboSSAO.kernel[i].z = randDir.z;
+      uboSSAO.kernel[i].w = 0.0f;
     }
 
-    VK_CHECK_RESULT(uniformBuffers.ssaoKernel.Create(
-        device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        sizeof(uboKernel), &uboKernel));
-  }
-
-  // Random Noise
-  {
     std::vector<glm::vec4> randDir(ROT_TEX_SIZE * ROT_TEX_SIZE);
     for (size_t i = 0; i < ROT_TEX_SIZE * ROT_TEX_SIZE; i++) {
       glm::vec2 v = dist.OnCircle(engine);
@@ -674,6 +695,15 @@ void SSAO::PrepareUniformBuffers() {
                               VK_FORMAT_R32G32B32A32_SFLOAT, ROT_TEX_SIZE,
                               ROT_TEX_SIZE, queue, VK_FILTER_NEAREST);
   }
+
+  // Lighting
+  {
+    uboLighting.displayRenderTarget = 0;
+    uboLighting.useBlur = true;
+    uboLighting.ao = 8.0f;
+  }
+
+  UpdateUniformBuffers();
 }
 
 //*-----------------------------------------------------------------------------
@@ -689,21 +719,22 @@ void SSAO::PrepareUniformBuffers() {
 void SSAO::BuildCommandBuffers() {
   VkCommandBufferBeginInfo commandBufferBeginInfo =
       Initializer::CommandBufferBeginInfo();
-  VkDeviceSize offsets[1] = {0};
 
   for (size_t i = 0; i < drawCmdBuffers.size(); i++) {
+
     VK_CHECK_RESULT(
         vkBeginCommandBuffer(drawCmdBuffers[i], &commandBufferBeginInfo));
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         Initializer::RenderPassBeginInfo();
 
-    // G-Buffer pass
+    // Fill G-Buffer
     {
-      std::vector<VkClearValue> clearValues(4);
-      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-      clearValues[1].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-      clearValues[2].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+      // フラグメントシェーダーで使用するすべてのアタッチメントをこの値でクリアします。
+      std::array<VkClearValue, 4> clearValues{};
+      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[1].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[2].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
       clearValues[3].depthStencil = {1.0f, 0};
 
       renderPassBeginInfo.renderPass = frameBuffers.gBuffer.renderPass;
@@ -731,24 +762,103 @@ void SSAO::BuildCommandBuffers() {
       vkCmdBindDescriptorSets(
           drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
           pipelineLayouts.gBuffer, 0, 1, &descriptorSets.gBuffer, 0, nullptr);
+      VkDeviceSize offsets[] = {0};
 
-      // Render scene
+      // Teapot
       {
-        // Teapot
-        {
-          vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
-                                 &models.teapot.vertices.buffer, offsets);
-          vkCmdBindIndexBuffer(drawCmdBuffers[i], models.teapot.indices.buffer,
-                               0, VK_INDEX_TYPE_UINT32);
-          vkCmdDrawIndexed(drawCmdBuffers[i], models.teapot.indexCount, 1, 0, 0,
-                           0);
-        }
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.teapot.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.teapot.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto &teapot = config["Teapot"];
+        const auto scale = glm::vec3(teapot["Scale"].get<float>());
+        const auto trans = glm::vec3(teapot["Position"][0].get<float>(),
+                                     teapot["Position"][1].get<float>(),
+                                     teapot["Position"][2].get<float>());
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model = glm::rotate(model, glm::radians(30.0f),
+                            glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 0;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.teapot.indexCount, 1, 0, 0,
+                         0);
+      }
+
+      // Floor
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.floor.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto scale = glm::vec3(4.0f);
+        const auto trans = glm::vec3(0.0f, 0.0f, 0.0f);
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 1;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0,
+                         0);
+      }
+
+      // Wall1
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.floor.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto scale = glm::vec3(4.0f);
+        const auto trans = glm::vec3(0.0f, 0.0f, -2.0f);
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model = glm::rotate(model, glm::radians(90.0f),
+                            glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 2;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0,
+                         0);
+      }
+
+      // Wall2
+      {
+        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
+                               &models.floor.vertices.buffer, offsets);
+        vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer, 0,
+                             VK_INDEX_TYPE_UINT32);
+        const auto scale = glm::vec3(4.0f);
+        const auto trans = glm::vec3(-2.0f, 0.0f, 0.0f);
+        auto model = glm::translate(glm::mat4(1.0f), trans);
+        model = glm::rotate(model, glm::radians(90.0f),
+                            glm::vec3(0.0f, 1.0f, 0.0f));
+        model =
+            glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0, 0.0f));
+        model = glm::scale(model, scale);
+        pushConsts.model = model;
+        pushConsts.tex = 2;
+        vkCmdPushConstants(drawCmdBuffers[i], pipelineLayouts.gBuffer,
+                           VK_SHADER_STAGE_VERTEX_BIT |
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(pushConsts), &pushConsts);
+        vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0,
+                         0);
       }
 
       vkCmdEndRenderPass(drawCmdBuffers[i]);
     }
 
-    // SSAO pass
+    // SSAO
     {
       std::vector<VkClearValue> clearValues(2);
       clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -783,7 +893,7 @@ void SSAO::BuildCommandBuffers() {
       vkCmdEndRenderPass(drawCmdBuffers[i]);
     }
 
-    // Blur pass
+    // Blur
     {
       std::vector<VkClearValue> clearValues(2);
       clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -818,36 +928,38 @@ void SSAO::BuildCommandBuffers() {
       vkCmdEndRenderPass(drawCmdBuffers[i]);
     }
 
-    // Lighting pass
+    // Lighting
     {
-      std::vector<VkClearValue> clearValues(2);
-      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-      clearValues[1].depthStencil = {1.0f, 0};
+      std::array<VkClearValue, 2> clear{};
+      clear[0].color = {{0.1f, 0.1f, 0.1f, 1.0f}};
+      clear[1].depthStencil = {1.0f, 0};
 
-      renderPassBeginInfo.renderPass = renderPass;
       renderPassBeginInfo.framebuffer = framebuffers[i];
+      renderPassBeginInfo.renderPass = renderPass;
       renderPassBeginInfo.renderArea.extent.width = swapchain.extent.width;
       renderPassBeginInfo.renderArea.extent.height = swapchain.extent.height;
-      renderPassBeginInfo.clearValueCount =
-          static_cast<uint32_t>(clearValues.size());
-      renderPassBeginInfo.pClearValues = clearValues.data();
 
+      // デフォルトのレンダーパス設定で指定された最初のサブパスを開始します。
+      // これにより、色と奥行きのアタッチメントがクリアされます。
       vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
+      // ビューポートとシザーの更新
       VkViewport viewport = Initializer::Viewport(
           static_cast<float>(swapchain.extent.width),
-          static_cast<float>(swapchain.extent.width), 0.0f, 1.0f);
+          static_cast<float>(swapchain.extent.height), 0.0f, 1.0f);
       vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
       VkRect2D scissor = Initializer::Rect2D(swapchain.extent.width,
-                                             swapchain.extent.width, 0, 0);
+                                             swapchain.extent.height, 0, 0);
       vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
+      // 記述子セットとパイプラインのバインド
       vkCmdBindDescriptorSets(
           drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
           pipelineLayouts.lighting, 0, 1, &descriptorSets.lighting, 0, nullptr);
       vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                         pipelines.lighting);
+
       vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
 
       DrawUI(drawCmdBuffers[i]);
@@ -865,68 +977,75 @@ void SSAO::BuildCommandBuffers() {
 //*-----------------------------------------------------------------------------
 
 void SSAO::UpdateUniformBuffers() {
-  const auto eyePt = config["Camera"]["Position"];
-  const auto lookAt = config["Camera"]["Target"];
-  camera.SetupOrient(glm::vec3(eyePt[0].get<float>(), eyePt[1].get<float>(),
-                               eyePt[2].get<float>()),
-                     glm::vec3(lookAt[0].get<float>(), lookAt[1].get<float>(),
-                               lookAt[2].get<float>()),
+  const auto cameraConfig = config["Camera"];
+  camera.SetupOrient(glm::vec3(cameraConfig["Position"][0].get<float>(),
+                               cameraConfig["Position"][1].get<float>(),
+                               cameraConfig["Position"][2].get<float>()),
+                     glm::vec3(cameraConfig["Target"][0].get<float>(),
+                               cameraConfig["Target"][1].get<float>(),
+                               cameraConfig["Target"][2].get<float>()),
                      glm::vec3(0.0f, 1.0f, 0.0f));
   camera.SetupPerspective(glm::radians(60.0f),
                           static_cast<float>(swapchain.extent.width) /
                               static_cast<float>(swapchain.extent.height),
                           0.3f, 100.0f);
 
-  UpdateSceneUniformBuffers();
-  UpdateSSAOUniformBuffers();
+  UpdateGBufferUniformBuffer();
+  UpdateSSAOUniformBuffer();
+  UpdateLightingUniformBuffer();
 }
 
-void SSAO::UpdateSceneUniformBuffers() {
+void SSAO::UpdateGBufferUniformBuffer() {
   // 行列をシェーダーに渡します。
-  uboScene.model = glm::mat4(1.0f);
-  uboScene.view = camera.GetViewMatrix();
-  uboScene.proj = camera.GetProjectionMatrix();
-
-  uboScene.nearPlane = camera.GetNear();
-  uboScene.farPlane = camera.GetFar();
+  uboGBuffer.view = camera.GetViewMatrix();
+  uboGBuffer.proj = camera.GetProjectionMatrix();
 
   // ユニフォームバッファへコピーします。
-  VK_CHECK_RESULT(uniformBuffers.scene.Map(device));
-  uniformBuffers.scene.Copy(&uboScene, sizeof(uboScene));
-  uniformBuffers.scene.Unmap(device);
+  uniformBuffers.gBuffer.Copy(&uboGBuffer, sizeof(uboGBuffer));
 }
 
-void SSAO::UpdateSSAOUniformBuffers() {
+void SSAO::UpdateSSAOUniformBuffer() {
   uboSSAO.proj = camera.GetProjectionMatrix();
 
+  uniformBuffers.ssao.Copy(&uboSSAO, sizeof(uboSSAO));
+}
+
+void SSAO::UpdateLightingUniformBuffer() {
+  int i = 0;
   for (const auto &light : config["Lights"]) {
     for (int j = 0; j < 4; j++) {
-      uboSSAO.light.pos[j] = light["Position"][j].get<float>();
+      uboLighting.lights[i].pos[j] = light["Position"][j].get<float>();
     }
-    uboSSAO.light.pos = uboScene.view * uboSSAO.light.pos;
+    uboLighting.lights[i].pos = uboGBuffer.view * uboLighting.lights[i].pos;
     for (int j = 0; j < 3; j++) {
-      uboSSAO.light.diff[j] = light["Ld"][j].get<float>();
+      uboLighting.lights[i].La[j] = light["La"][j].get<float>();
+      uboLighting.lights[i].Ld[j] = light["Ld"][j].get<float>();
     }
-    for (int j = 0; j < 3; j++) {
-      uboSSAO.light.amb[j] = light["La"][j].get<float>();
-    }
+    i++;
   }
 
-  VK_CHECK_RESULT(uniformBuffers.ssao.Map(device));
-  uniformBuffers.ssao.Copy(&uboSSAO, sizeof(uboSSAO));
-  uniformBuffers.ssao.Unmap(device);
+  uboLighting.lightsNum = static_cast<int>(config["Lights"].size());
+
+  uniformBuffers.lighting.Copy(&uboLighting, sizeof(uboLighting));
 }
 
 void SSAO::OnUpdateUIOverlay() {
-  if (uiOverlay.Combo("Display Render Target", &uboSSAO.displayRenderTarget,
-                      {"Final Result", "SSAO Only", "Albedo Only", "Position",
+  if (uiOverlay.Combo("Display Render Target", &uboLighting.displayRenderTarget,
+                      {"Final Result", "Only SSAO", "No SSAO", "Position",
                        "Normal", "Albedo"})) {
-    UpdateSSAOUniformBuffers();
+    UpdateLightingUniformBuffer();
   }
-  if (uiOverlay.Checkbox("Use Blur", &uboSSAO.useBlur)) {
-    UpdateSSAOUniformBuffers();
+  if (uiOverlay.Checkbox("Use Blur", &uboLighting.useBlur)) {
+    UpdateLightingUniformBuffer();
   }
-  if (uiOverlay.SliderFloat("AO Parameterization", &uboSSAO.ao, 0.01f, 1.0f)) {
-    UpdateSSAOUniformBuffers();
+  if (uiOverlay.SliderFloat("Sampling Radius", &uboSSAO.radius, 0.1f, 1.0f)) {
+    UpdateSSAOUniformBuffer();
+  }
+  if (uiOverlay.SliderFloat("Sampling Bias", &uboSSAO.bias, 0.0f, 0.1f)) {
+    UpdateSSAOUniformBuffer();
+  }
+  if (uiOverlay.SliderFloat("AO Parameterization", &uboLighting.ao, 1.0f,
+                            10.0f)) {
+    UpdateLightingUniformBuffer();
   }
 }

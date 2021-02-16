@@ -1,49 +1,52 @@
 {
-  "AppName" : "Screen Space Ambient Occlusion",
-  "Width" : 1280,
-  "Height" : 720,
-  "Samples" : 0,
-  "Resizable": true,
-  "UIOverlay": true,
-  "Pipelines": {
-    "G-Buffer": {
-      "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/GBuffer.vs.spv",
-      "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/GBuffer.fs.spv"
+    "AppName" : "Screen Space Ambient Occlusion",
+    "Width" : 1280,
+    "Height" : 720,
+    "Samples" : 0,
+    "Resizable": true,
+    "UIOverlay": true,
+    "Pipelines": {
+        "G-Buffer": {
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/GBuffer.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/GBuffer.fs.spv"
+        },
+        "SSAO": {
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/PostProcess.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/SSAO.fs.spv"
+        },
+        "Blur": {
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/PostProcess.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/Blur.fs.spv"
+        },
+        "Lighting": {
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/PostProcess.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/Lighting.fs.spv"
+        }
     },
-    "SSAO": {
-      "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/PostProcessing.vs.spv",
-      "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/SSAO.fs.spv"
+    "Teapot": {
+        "Model": "./Assets/Models/dae/Teapot/teapot.dae",
+        "Scale": 0.3,
+        "Color": [0.9, 0.5, 0.2],
+        "Position": [0, 0.282958, 0]
     },
-    "Blur": {
-      "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/PostProcessing.vs.spv",
-      "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/Blur.fs.spv"
+    "Floor": {
+        "Model": "./Assets/Models/dae/Primitives/plane.dae",
+        "Texture": "./Assets/Textures/ktx/Wood/regular+herringbone+parquet-1024x1024.ktx"
     },
-    "Lighting": {
-      "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/PostProcessing.vs.spv",
-      "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/SSAO/Lighting.fs.spv"
-    }
-  },
-  "Teapot": {
-    "Model": "./Assets/Models/dae/Teapot/teapot.dae",
-    "Scale": 0.3,
-    "Color": [0.9, 0.5, 0.2],
-    "Position": [0, 0.282958, 0]
-  },
-  "Floor": {
-    "Model": "./Assets/Models/dae/Primitives/plane.dae",
-    "Scale": 10.0,
-    "Color": [0.4, 0.4, 0.4],
-    "Position": [0, -0.75, 0]
-  },
-  "Camera": {
-    "Position": [2.1, 1.5, 2.1],
-    "Target": [0, 1, 0]
-  },
-  "Lights": [
-    {
-      "Position": [0, 3, 0, 0],
-      "Ld": [0.3, 0.3, 0.3],
-      "La": [0.5, 0.5, 0.5]
-    }
-  ]
+    "Wall": {
+        "Model": "./Assets/Models/dae/Primitives/plane.dae",
+        "Texture": "./Assets/Textures/ktx/Brick/ruin_wall_01.ktx"
+    },
+    "Camera": {
+        "Position": [2.1, 1.5, 2.1],
+        "Target": [0, 1, 0]
+    },
+    "Lights": [
+        {
+            "Position": [3, 3, 1.5, 1],
+            "Ld": [0.5, 0.5, 0.5],
+            "La": [0.5, 0.5, 0.5]
+        }
+    ]
 }
+  

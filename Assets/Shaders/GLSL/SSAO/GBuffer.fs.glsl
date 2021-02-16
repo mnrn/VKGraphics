@@ -9,21 +9,26 @@ layout (location = 0) out vec4 PositionData;
 layout (location = 1) out vec4 NormalData;
 layout (location = 2) out vec4 AlbedoData;
 
-layout (binding = 0) uniform UniformBufferObject {
-    mat4 Model;
-    mat4 View;
-    mat4 Proj;
-    float NearPlane;
-    float FarPlane;
-} ubo;
+layout (binding = 1) uniform sampler2D Tex1;
+layout (binding = 2) uniform sampler2D Tex2;
 
-float LinearDepth(float depth) {
-    float z = depth * 2.0 - 1.0;
-    return (2.0 * ubo.NearPlane * ubo.FarPlane) / (ubo.FarPlane + ubo.NearPlane - z * (ubo.FarPlane - ubo.NearPlane));
-}
+layout (push_constant) uniform PushConstants {
+    mat4 Dummy;
+    int Tex;
+} pushConsts;
 
 void main() {
-    PositionData = vec4(Position, LinearDepth(gl_FragCoord.z));
+    PositionData = vec4(Position, 1.0);
     NormalData = vec4(normalize(Normal), 1.0);
-    AlbedoData = vec4(Color, 1.0);
+    switch (pushConsts.Tex) {
+        case 1:
+            AlbedoData = texture(Tex1, UV);
+            break;
+        case 2:
+            AlbedoData = texture(Tex2, UV);
+            break;
+        default:
+            AlbedoData = vec4(Color, 1.0);
+            break;
+    } 
 }

@@ -15,7 +15,6 @@ class SSAO : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;
-  void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
   void LoadAssets();
@@ -23,8 +22,9 @@ public:
   void PrepareUniformBuffers();
 
   void UpdateUniformBuffers();
-  void UpdateSceneUniformBuffers();
-  void UpdateSSAOUniformBuffers();
+  void UpdateGBufferUniformBuffer();
+  void UpdateSSAOUniformBuffer();
+  void UpdateLightingUniformBuffer();
 
   void SetupDescriptorPool();
   void SetupDescriptorSet();
@@ -53,41 +53,47 @@ private:
   } models;
 
   struct {
+    Texture2D floor;
+    Texture2D wall;
     Texture2D noise;
   } textures;
 
-  struct {
+  struct PushConstants {
     alignas(16) glm::mat4 model;
+    alignas(4) int tex;
+  } pushConsts;
+
+  struct {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-    alignas(4) float nearPlane;
-    alignas(4) float farPlane;
-  } uboScene;
+  } uboGBuffer;
 
   struct {
     alignas(16) glm::vec4 kernel[KERNEL_SIZE];
+    alignas(16) glm::mat4 proj;
     alignas(4) float radius;
     alignas(4) float bias;
-  } uboKernel;
+  } uboSSAO;
 
   struct Light {
     alignas(16) glm::vec4 pos;
-    alignas(16) glm::vec3 diff;
-    alignas(16) glm::vec3 amb;
+    alignas(16) glm::vec3 La;
+    alignas(16) glm::vec3 Ld;
   };
 
   struct {
-    alignas(16) glm::mat4 proj;
-    Light light;
+    Light lights[8];
+    alignas(4) int lightsNum;
     alignas(4) int displayRenderTarget;
     alignas(4) bool useBlur;
     alignas(4) float ao;
-  } uboSSAO;
+  } uboLighting;
 
   struct {
-    Buffer scene;
-    Buffer ssaoKernel;
+    Buffer gBuffer;
     Buffer ssao;
+    Buffer blur;
+    Buffer lighting;
   } uniformBuffers;
 
   struct {
@@ -109,7 +115,7 @@ private:
     VkDescriptorSet ssao;
     VkDescriptorSet blur;
     VkDescriptorSet lighting;
-    const uint32_t count = 4;
+    const uint32_t maxSets = 4;
   } descriptorSets;
 
   struct {
@@ -125,8 +131,5 @@ private:
     Framebuffer blur;
   } frameBuffers;
 
-  VkSampler colorSampler = VK_NULL_HANDLE;
   Camera camera{};
-
-  float prevTime = 0.0f;
 };
