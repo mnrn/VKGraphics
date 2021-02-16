@@ -450,6 +450,9 @@ void ProtoSSAO::PrepareUniformBuffers() {
                                      sizeof(uboLighting), &uboLighting));
   VK_CHECK_RESULT(uniformBuffers.lighting.Map(device));
 
+
+  uboLighting.displayRenderTarget = 0;
+
   UpdateUniformBuffers();
 }
 
@@ -470,7 +473,6 @@ void ProtoSSAO::BuildCommandBuffers() {
   for (size_t i = 0; i < drawCmdBuffers.size(); i++) {
     
     VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &commandBufferBeginInfo));
-
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         Initializer::RenderPassBeginInfo();
@@ -662,11 +664,11 @@ void ProtoSSAO::UpdateUniformBuffers() {
                           static_cast<float>(swapchain.extent.width) /
                               static_cast<float>(swapchain.extent.height),
                           0.3f, 100.0f);
-  UpdateOffscreenUniformBuffers();
-  UpdateCompositionUniformBuffers();
+  UpdateGBufferUniformBuffers();
+  UpdateLightingUniformBuffers();
 }
 
-void ProtoSSAO::UpdateOffscreenUniformBuffers() {
+void ProtoSSAO::UpdateGBufferUniformBuffers() {
   // 行列をシェーダーに渡します。
   uboGBuffer.view = camera.GetViewMatrix();
   uboGBuffer.proj = camera.GetProjectionMatrix();
@@ -675,7 +677,7 @@ void ProtoSSAO::UpdateOffscreenUniformBuffers() {
   uniformBuffers.gBuffer.Copy(&uboGBuffer, sizeof(uboGBuffer));
 }
 
-void ProtoSSAO::UpdateCompositionUniformBuffers() {
+void ProtoSSAO::UpdateLightingUniformBuffers() {
   int i = 0;
   for (const auto &light : config["Lights"]) {
     for (int j = 0; j < 4; j++) {
@@ -691,15 +693,14 @@ void ProtoSSAO::UpdateCompositionUniformBuffers() {
   }
 
   uboLighting.lightsNum = static_cast<int>(config["Lights"].size());
-  uboLighting.displayRenderTarget = settings.dispRenderTarget;
 
   uniformBuffers.lighting.Copy(&uboLighting, sizeof(uboLighting));
 }
 
 void ProtoSSAO::OnUpdateUIOverlay() {
-  if (uiOverlay.Combo("Display Render Target", &settings.dispRenderTarget,
+  if (uiOverlay.Combo("Display Render Target", &uboLighting.displayRenderTarget,
                       {"Final Result", "Only SSAO", "No SSAO", "Position",
                        "Normal", "Albedo"})) {
-    UpdateCompositionUniformBuffers();
+    UpdateLightingUniformBuffers();
   }
 }

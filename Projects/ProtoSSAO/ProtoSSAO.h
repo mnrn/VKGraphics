@@ -23,8 +23,8 @@ public:
   void PrepareUniformBuffers();
 
   void UpdateUniformBuffers();
-  void UpdateOffscreenUniformBuffers();
-  void UpdateCompositionUniformBuffers();
+  void UpdateGBufferUniformBuffers();
+  void UpdateLightingUniformBuffers();
 
   void SetupDescriptorPool();
   void SetupDescriptorSet();
@@ -112,8 +112,4 @@ private:
 
   float prevTime = 0.0f;
   float camAngle = 0.0f;
-
-  struct Settings {
-    int dispRenderTarget = 0;
-  } settings;
 };
