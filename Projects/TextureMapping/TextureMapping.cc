@@ -305,7 +305,8 @@ void TextureMapping::SetupDescriptorSet() {
                                       &uniformBuffer.descriptor),
       Initializer::WriteDescriptorSet(descriptorSet,
                                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      1, &texture.descriptor)};
+                                      1, &texture.descriptor),
+  };
   vkUpdateDescriptorSets(device,
                          static_cast<uint32_t>(writeDescriptorSets.size()),
                          writeDescriptorSets.data(), 0, nullptr);

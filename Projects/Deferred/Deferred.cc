@@ -343,10 +343,10 @@ void Deferred::SetupPipelines() {
       // location = 0 : position
       Initializer::VertexInputAttributeDescription(
           0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
-      // location = 1 : color
+      // location = 1 : normal
       Initializer::VertexInputAttributeDescription(
           0, 1, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)),
-      // location = 2 : normal
+      // location = 2 : color
       Initializer::VertexInputAttributeDescription(
           0, 2, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)),
   };
@@ -644,9 +644,8 @@ void Deferred::UpdateUniformBuffers() {
 
 void Deferred::UpdateOffscreenUniformBuffers() {
   // 行列をシェーダーに渡します。
-  const auto view = camera.GetViewMatrix();
-  const auto proj = camera.GetProjectionMatrix();
-  uboOffscreenVS.viewProj = proj * view;
+  uboOffscreenVS.view = camera.GetViewMatrix();
+  uboOffscreenVS.proj = camera.GetProjectionMatrix();
 
   // ユニフォームバッファへコピーします。
   uniformBuffers.offscreen.Copy(&uboOffscreenVS, sizeof(uboOffscreenVS));

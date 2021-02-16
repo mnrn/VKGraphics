@@ -37,7 +37,7 @@ void main() {
     // サンプリングを行い、AO(環境遮蔽)の係数値を計算します。
     float occ = 0.0;
     for (int i = 0; i < KERNEL_SIZE; i++) {
-        vec3 samplePos = pos + Radius * (TBN * samples[i]);
+        vec3 samplePos = pos + uboKernel.Radius * (TBN * uboKernel.Samples[i].xyz);
 
         // カメラ座標->クリップ座標->正規化デバイス座標->テクスチャ座標
         vec4 p = uboMatrices.Proj * vec4(samplePos, 1.0);
@@ -45,8 +45,8 @@ void main() {
         p.xyz = p.xyz * 0.5 + 0.5;
 
         // サンプル点と比較し、遮蔽されるようであれば環境遮蔽係数に加算します。
-        float surfZ = texture(PositionTex, p.xy).z;
-        float range = smoothstep(0.0, 1.0, Radius / abs(pos.z - surfZ));
+        float surfZ = texture(PositionDepthTex, p.xy).z;
+        float range = smoothstep(0.0, 1.0, uboKernel.Radius / abs(pos.z - surfZ));
         occ += (surfZ >= samplePos.z + uboKernel.Bias ? 1.0 : 0.0) * range;
     }
     occ = 1.0 - (occ / float(KERNEL_SIZE));

@@ -24,16 +24,24 @@ layout (location = 0) in vec2 UV;
 layout (location = 0) out vec4 FragColor;
 
 vec3 AmbientDiffuseModel(vec3 pos, vec3 norm, vec3 albedo, float ao) {
-    if (ubo.DisplayRenderTarget == 1) {
-        return vec3(ao);    
-    }
-
     vec3 amb = ubo.Light.La * albedo * ao;
     vec3 L = normalize(vec3(ubo.Light.Position) - pos);
     float NoL = max(dot(norm, L), 0.0);
-    return ubo.DisplayRenderTarget == 2
-        ?  ubo.Light.Ld * albedo * NoL
-        : amb + ubo.Light.Ld * albedo * NoL;
+
+    switch (ubo.DisplayRenderTarget) {
+        case 1:
+            return vec3(ao);  
+        case 2:
+            return ubo.Light.Ld * albedo * NoL;
+        case 3:
+            return pos;
+        case 4:
+            return norm;
+        case 5:
+            return albedo;
+        default:
+            return amb + ubo.Light.Ld * albedo * NoL;
+    }
 }
 
 void main () {

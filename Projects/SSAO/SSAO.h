@@ -15,7 +15,6 @@ class SSAO : public VkBase {
 public:
   void OnPostInit() override;
   void OnPreDestroy() override;
-  void OnRender() override;
   void OnUpdate(float t) override;
   void OnUpdateUIOverlay() override;
 
@@ -110,7 +109,7 @@ private:
     VkDescriptorSet ssao;
     VkDescriptorSet blur;
     VkDescriptorSet lighting;
-    const uint32_t count = 5;
+    const uint32_t count = 4;
   } descriptorSets;
 
   struct {
@@ -127,12 +126,7 @@ private:
   } frameBuffers;
 
   VkSampler colorSampler = VK_NULL_HANDLE;
-
-  VkCommandBuffer offscreenCmdBuffer = VK_NULL_HANDLE;
-  VkSemaphore offscreenSemaphore = VK_NULL_HANDLE;
-
   Camera camera{};
 
   float prevTime = 0.0f;
-  float camAngle = 0.0f;
 };

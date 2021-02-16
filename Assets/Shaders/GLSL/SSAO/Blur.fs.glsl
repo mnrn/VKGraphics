@@ -4,7 +4,7 @@ layout (location = 0) in vec2 UV;
 
 layout (location = 0) out float FragColor;
 
-layout (location = 0) uniform sampler2D AOTex;
+layout (binding = 0) uniform sampler2D AOTex;
 
 void main () {
     vec2 texelSize = 1.0 / vec2(textureSize(AOTex, 0));

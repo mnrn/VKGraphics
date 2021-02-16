@@ -15,10 +15,6 @@
 #include "Math/UniformDistribution.h"
 
 //*-----------------------------------------------------------------------------
-// Constant expressions
-//*-----------------------------------------------------------------------------
-
-//*-----------------------------------------------------------------------------
 // Overrides functions
 //*-----------------------------------------------------------------------------
 
@@ -37,8 +33,6 @@ void SSAO::OnPostInit() {
 }
 
 void SSAO::OnPreDestroy() {
-  vkDestroySemaphore(device, offscreenSemaphore, nullptr);
-
   vkDestroyPipeline(device, pipelines.lighting, nullptr);
   vkDestroyPipeline(device, pipelines.ssao, nullptr);
   vkDestroyPipeline(device, pipelines.blur, nullptr);
@@ -54,6 +48,8 @@ void SSAO::OnPreDestroy() {
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.ssao, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.gBuffer, nullptr);
 
+  vkDestroySampler(device, colorSampler, nullptr);
+
   frameBuffers.blur.Destroy(device);
   frameBuffers.ssao.Destroy(device);
   frameBuffers.gBuffer.Destroy(device);
@@ -68,49 +64,7 @@ void SSAO::OnPreDestroy() {
   models.teapot.Destroy(device);
 }
 
-void SSAO::OnUpdate(float t) {
-  const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
-  prevTime = t;
-
-  camAngle = glm::mod(
-      camAngle + config["Camera"]["RotationSpeed"].get<float>() * deltaT,
-      glm::two_pi<float>());
-  UpdateUniformBuffers();
-}
-
-void SSAO::OnRender() {
-  VkBase::PrepareFrame();
-
-  // シーンレンダリングコマンドバッファはオフスクリーンのレンダリングが終了まで待機する必要があります
-  // これを確実にするために、オフスクリーンレンダリングが終了したときに通知される専用のオフスクリーン同期セマフォを使用します。
-  // これは実装が両方のコマンドバッファを同時に開始する可能性があるため必要になります。
-  // コマンドバッファがアプリによって送信された順序で実行される保証はありません。
-
-  // オフスクリーンレンダリング
-
-  // スワップチェインが終了するまで待機します。
-  submitInfo.pWaitSemaphores = &semaphores.presentComplete;
-  // オフスクリーンセマフォでシグナル準備します。
-  submitInfo.pSignalSemaphores = &offscreenSemaphore;
-
-  // Submit work
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &offscreenCmdBuffer;
-  VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-
-  // シーンレンダリング
-
-  // オフスクリーンセマフォを待機します。
-  submitInfo.pWaitSemaphores = &offscreenSemaphore;
-  // 描画完了セマフォでシグナル準備完了です。
-  submitInfo.pSignalSemaphores = &semaphores.renderComplete;
-
-  // Submit work
-  submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-  VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-
-  VkBase::SubmitFrame();
-}
+void SSAO::OnUpdate(float) {}
 
 void SSAO::ViewChanged() { UpdateUniformBuffers(); }
 
@@ -146,13 +100,30 @@ void SSAO::LoadAssets() {
 // Setup
 //*-----------------------------------------------------------------------------
 
+void SSAO::SetupDescriptorPool() {
+  // APIに記述子の最大数を通知する必要があります。
+  std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10),
+      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                      12),
+  };
+
+  // グローバル記述子プールを生成します。
+  VkDescriptorPoolCreateInfo descriptorPoolInfo =
+      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes,
+                                            descriptorSets.count);
+
+  VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
+                                         &descriptorPool));
+}
+
 /**
  * @brief 使用される記述子を設定します。<br>
  * 基本的に、様々なシェーダーステージを記述子に接続して、UniformBuffersやImageSamplerなどをバインドします。<br>
  * したがって、すべてのシェーダーバインディングは、1つの記述子セットレイアウトバインディングにマップする必要があります。
  */
 void SSAO::SetupDescriptorSet() {
-  std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+  std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings{};
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
       Initializer::PipelineLayoutCreateInfo();
@@ -166,9 +137,11 @@ void SSAO::SetupDescriptorSet() {
     descriptorSetLayoutBindings = {
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+        /*
         Initializer::DescriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+        */
     };
     descriptorSetLayoutCreateInfo =
         Initializer::DescriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
@@ -368,23 +341,6 @@ void SSAO::SetupDescriptorSet() {
   }
 }
 
-void SSAO::SetupDescriptorPool() {
-  // APIに記述子の最大数を通知する必要があります。
-  std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
-      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10),
-      Initializer::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                      12),
-  };
-
-  // グローバル記述子プールを生成します。
-  VkDescriptorPoolCreateInfo descriptorPoolInfo =
-      Initializer::DescriptorPoolCreateInfo(descriptorPoolSizes,
-                                            descriptorSets.count);
-
-  VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr,
-                                         &descriptorPool));
-}
-
 /**
  * @note
  * Vulkanは、レンダリングパイプラインの概念を用いてFixedStatusをカプセル化し、OpenGLの複雑なステートマシンを置き換えます。<br>
@@ -557,8 +513,8 @@ void SSAO::SetupPipelines() {
         pipelinesConfig["G-Buffer"]["FragmentShader"].get<std::string>(),
         VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    // レンダーパスは別にします。
     pipelineCreateInfo.renderPass = frameBuffers.gBuffer.renderPass;
+    pipelineCreateInfo.layout = pipelineLayouts.gBuffer;
 
     // カラーアタッチメントに何も描画しないようにします。
     std::array<VkPipelineColorBlendAttachmentState, 3>
@@ -662,18 +618,21 @@ void SSAO::PrepareUniformBuffers() {
                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                   sizeof(uboScene), &uboScene));
-  VK_CHECK_RESULT(uniformBuffers.scene.Map(device));
 
   VK_CHECK_RESULT(
       uniformBuffers.ssao.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                  sizeof(uboSSAO), &uboSSAO));
-  VK_CHECK_RESULT(uniformBuffers.ssao.Map(device));
+
+  uboSSAO.displayRenderTarget = 0;
+  uboSSAO.useBlur = true;
+  uboSSAO.ao = 8.0f;
 
   UpdateUniformBuffers();
 
-  std::mt19937 engine(std::random_device);
+  std::random_device rd;
+  std::mt19937 engine(rd());
   UniformDistribution dist;
 
   // Kernel
@@ -781,16 +740,6 @@ void SSAO::BuildCommandBuffers() {
           vkCmdBindIndexBuffer(drawCmdBuffers[i], models.teapot.indices.buffer,
                                0, VK_INDEX_TYPE_UINT32);
           vkCmdDrawIndexed(drawCmdBuffers[i], models.teapot.indexCount, 1, 0, 0,
-                           0);
-        }
-
-        // Floor
-        {
-          vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1,
-                                 &models.floor.vertices.buffer, offsets);
-          vkCmdBindIndexBuffer(drawCmdBuffers[i], models.floor.indices.buffer,
-                               0, VK_INDEX_TYPE_UINT32);
-          vkCmdDrawIndexed(drawCmdBuffers[i], models.floor.indexCount, 1, 0, 0,
                            0);
         }
       }
@@ -941,6 +890,7 @@ void SSAO::UpdateSceneUniformBuffers() {
   uboScene.farPlane = camera.GetFar();
 
   // ユニフォームバッファへコピーします。
+  VK_CHECK_RESULT(uniformBuffers.scene.Map(device));
   uniformBuffers.scene.Copy(&uboScene, sizeof(uboScene));
   uniformBuffers.scene.Unmap(device);
 }
@@ -952,6 +902,7 @@ void SSAO::UpdateSSAOUniformBuffers() {
     for (int j = 0; j < 4; j++) {
       uboSSAO.light.pos[j] = light["Position"][j].get<float>();
     }
+    uboSSAO.light.pos = uboScene.view * uboSSAO.light.pos;
     for (int j = 0; j < 3; j++) {
       uboSSAO.light.diff[j] = light["Ld"][j].get<float>();
     }
@@ -959,17 +910,16 @@ void SSAO::UpdateSSAOUniformBuffers() {
       uboSSAO.light.amb[j] = light["La"][j].get<float>();
     }
   }
-  uboSSAO.displayRenderTarget = 0;
-  uboSSAO.useBlur = true;
-  uboSSAO.ao = 8.0f;
 
+  VK_CHECK_RESULT(uniformBuffers.ssao.Map(device));
   uniformBuffers.ssao.Copy(&uboSSAO, sizeof(uboSSAO));
   uniformBuffers.ssao.Unmap(device);
 }
 
 void SSAO::OnUpdateUIOverlay() {
   if (uiOverlay.Combo("Display Render Target", &uboSSAO.displayRenderTarget,
-                      {"Final Result", "SSAO Only", "Albedo Only"})) {
+                      {"Final Result", "SSAO Only", "Albedo Only", "Position",
+                       "Normal", "Albedo"})) {
     UpdateSSAOUniformBuffers();
   }
   if (uiOverlay.Checkbox("Use Blur", &uboSSAO.useBlur)) {

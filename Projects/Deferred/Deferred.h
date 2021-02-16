@@ -42,8 +42,8 @@ private:
   VertexLayout vertexLayout{
       {
           VertexLayoutComponent::Position,
-          VertexLayoutComponent::Color,
           VertexLayoutComponent::Normal,
+          VertexLayoutComponent::Color,
       },
   };
 
@@ -54,7 +54,8 @@ private:
   } models;
 
   struct {
-    alignas(16) glm::mat4 viewProj;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
   } uboOffscreenVS;
 
   struct Light {

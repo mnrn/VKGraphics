@@ -69,4 +69,4 @@ if __name__ == '__main__':
     compiler = Compiler()
 
     compiler.compiles('GLSL')
-    compiler.compiles('HLSL')
+    #compiler.compiles('HLSL')
