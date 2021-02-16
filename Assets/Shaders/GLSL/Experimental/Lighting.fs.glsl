@@ -5,6 +5,7 @@ layout (location = 0) in vec2 UV;
 layout (binding = 1) uniform sampler2D PosTex;
 layout (binding = 2) uniform sampler2D NormTex;
 layout (binding = 3) uniform sampler2D AlbedoTex;
+layout (binding = 4) uniform sampler2D AOTex;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -47,7 +48,10 @@ void main() {
     vec3 pos = texture(PosTex, UV).xyz;
     vec3 norm = texture(NormTex, UV).xyz;
     vec4 albedo = texture(AlbedoTex, UV);
-    float ao = 0.1;
+    float ao = texture(AOTex, UV).r;
+
+    // aoのパラメータ化を行います。
+    ao = pow(ao, ubo.AO);
 
     vec3 fragColor = vec3(0.0);
     for (int i = 0; i < ubo.LightsNum; i++) {

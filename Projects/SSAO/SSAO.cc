@@ -29,6 +29,7 @@ void SSAO::OnPostInit() {
   SetupDescriptorSet();
   SetupPipelines();
 
+  UpdateUIOverlay();
   BuildCommandBuffers();
 }
 

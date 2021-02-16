@@ -56,6 +56,7 @@ private:
   struct {
     Texture2D floor;
     Texture2D wall;
+    Texture2D noise;
   } textures;
 
   struct PushConstants {
