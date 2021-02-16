@@ -23,8 +23,9 @@ public:
   void PrepareUniformBuffers();
 
   void UpdateUniformBuffers();
-  void UpdateGBufferUniformBuffers();
-  void UpdateLightingUniformBuffers();
+  void UpdateGBufferUniformBuffer();
+  void UpdateSSAOUniformBuffer();
+  void UpdateLightingUniformBuffer();
 
   void SetupDescriptorPool();
   void SetupDescriptorSet();
@@ -35,6 +36,9 @@ public:
   void ViewChanged() override;
 
 private:
+  static constexpr inline size_t KERNEL_SIZE = 64;
+  static constexpr inline size_t ROT_TEX_SIZE = 4;
+
   VertexLayout vertexLayout{
       {
           VertexLayoutComponent::Position,
@@ -64,6 +68,13 @@ private:
     alignas(16) glm::mat4 proj;
   } uboGBuffer;
 
+  struct {
+    alignas(16) glm::vec4 kernel[KERNEL_SIZE];
+    alignas(16) glm::mat4 proj;
+    alignas(4) float radius;
+    alignas(4) float bias;
+  } uboSSAO;
+
   struct Light {
     alignas(16) glm::vec4 pos;
     alignas(16) glm::vec3 La;
@@ -80,36 +91,39 @@ private:
 
   struct {
     Buffer gBuffer;
+    Buffer ssao;
     Buffer lighting;
   } uniformBuffers;
 
   struct {
     VkPipeline gBuffer;
+    VkPipeline ssao;
     VkPipeline lighting;
   } pipelines;
 
   struct {
     VkPipelineLayout gBuffer;
+    VkPipelineLayout ssao;
     VkPipelineLayout lighting;
   } pipelineLayouts;
 
   struct {
     VkDescriptorSet gBuffer;
+    VkDescriptorSet ssao;
     VkDescriptorSet lighting;
-    const uint32_t maxSets = 2;
+    const uint32_t maxSets = 3;
   } descriptorSets;
 
   struct {
     VkDescriptorSetLayout gBuffer;
+    VkDescriptorSetLayout ssao;
     VkDescriptorSetLayout lighting;
   } descriptorSetLayouts;
 
   struct {
     Framebuffer gBuffer;
+    Framebuffer ssao;
   } frameBuffers;
 
   Camera camera{};
-
-  float prevTime = 0.0f;
-  float camAngle = 0.0f;
 };

@@ -6,10 +6,13 @@
 #include <array>
 #include <boost/assert.hpp>
 #include <vector>
+#include <random>
 
 #include "VK/Common.h"
 #include "VK/Initializer.h"
 #include "VK/Utils.h"
+
+#include "Math/UniformDistribution.h"
 
 //*-----------------------------------------------------------------------------
 // Overrides functions
@@ -31,17 +34,22 @@ void ProtoSSAO::OnPostInit() {
 
 void ProtoSSAO::OnPreDestroy() {
   vkDestroyPipeline(device, pipelines.lighting, nullptr);
+  vkDestroyPipeline(device, pipelines.ssao, nullptr);
   vkDestroyPipeline(device, pipelines.gBuffer, nullptr);
 
   vkDestroyPipelineLayout(device, pipelineLayouts.lighting, nullptr);
+  vkDestroyPipelineLayout(device, pipelineLayouts.ssao, nullptr);
   vkDestroyPipelineLayout(device, pipelineLayouts.gBuffer, nullptr);
 
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.lighting, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.ssao, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.gBuffer, nullptr);
 
+  frameBuffers.ssao.Destroy(device);
   frameBuffers.gBuffer.Destroy(device);
 
   uniformBuffers.lighting.Destroy(device);
+  uniformBuffers.ssao.Destroy(device);
   uniformBuffers.gBuffer.Destroy(device);
 
   textures.wall.Destroy(device);
@@ -51,13 +59,7 @@ void ProtoSSAO::OnPreDestroy() {
   models.teapot.Destroy(device);
 }
 
-void ProtoSSAO::OnUpdate(float t) {
-  const float deltaT = prevTime == 0.0f ? 0.0f : t - prevTime;
-  prevTime = t;
-
-  camAngle = glm::mod(
-      camAngle + config["Camera"]["RotationSpeed"].get<float>() * deltaT,
-      glm::two_pi<float>());
+void ProtoSSAO::OnUpdate(float) {
   UpdateUniformBuffers();
 }
 
@@ -186,7 +188,12 @@ void ProtoSSAO::SetupDescriptorSet() {
                            writeDescriptorSets.data(), 0, nullptr);
   }
 
-  // Composition + Lighting
+  // SSAO
+  {
+
+  }
+
+  // Lighting
   {
     descriptorSetLayoutBindings = {
         Initializer::DescriptorSetLayoutBinding(
@@ -327,63 +334,67 @@ void ProtoSSAO::SetupPipelines() {
   VkPipelineVertexInputStateCreateInfo emptyVertexInputState =
       Initializer::PipelineVertexInputStateCreateInfo();
   pipelineCreateInfo.pVertexInputState = &emptyVertexInputState;
-  VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
-                                            &pipelineCreateInfo, nullptr,
-                                            &pipelines.lighting));
-  vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
-  vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+  // Lighting pipeline
+  {
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
+                                              &pipelineCreateInfo, nullptr,
+                                              &pipelines.lighting));
+    vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+    vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+  }
 
-  // オフスクリーン用のパイプラインを生成します。
+  // G-Buffer pipeline
+  {
+    std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
+        Initializer::VertexInputBindingDescription(0, vertexLayout.Stride(),
+                                                   VK_VERTEX_INPUT_RATE_VERTEX),
+    };
+    std::vector<VkVertexInputAttributeDescription> vertexInputAttributes = {
+        // location = 0 : position
+        Initializer::VertexInputAttributeDescription(
+            0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
+        // location = 1 : normal
+        Initializer::VertexInputAttributeDescription(
+            0, 1, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)),
+        // location = 2 : color
+        Initializer::VertexInputAttributeDescription(
+            0, 2, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)),
+        // location = 3 : uv
+        Initializer::VertexInputAttributeDescription(
+            0, 3, VK_FORMAT_R32G32_SFLOAT, 9 * sizeof(float)),
+    };
+    VkPipelineVertexInputStateCreateInfo vertexInputState =
+        Initializer::PipelineVertexInputStateCreateInfo(vertexInputBindings,
+                                                        vertexInputAttributes);
+    pipelineCreateInfo.pVertexInputState = &vertexInputState;
+    shaderStages[0] = CreateShader(
+        device, pipelinesConfig["G-Buffer"]["VertexShader"].get<std::string>(),
+        VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] = CreateShader(
+        device, pipelinesConfig["G-Buffer"]["FragmentShader"].get<std::string>(),
+        VK_SHADER_STAGE_FRAGMENT_BIT);
 
-  std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
-      Initializer::VertexInputBindingDescription(0, vertexLayout.Stride(),
-                                                 VK_VERTEX_INPUT_RATE_VERTEX),
-  };
-  std::vector<VkVertexInputAttributeDescription> vertexInputAttributes = {
-      // location = 0 : position
-      Initializer::VertexInputAttributeDescription(
-          0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),
-      // location = 1 : normal
-      Initializer::VertexInputAttributeDescription(
-          0, 1, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)),
-      // location = 2 : color
-      Initializer::VertexInputAttributeDescription(
-          0, 2, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)),
-      // location = 3 : uv
-      Initializer::VertexInputAttributeDescription(
-          0, 3, VK_FORMAT_R32G32_SFLOAT, 9 * sizeof(float)),
-  };
-  VkPipelineVertexInputStateCreateInfo vertexInputState =
-      Initializer::PipelineVertexInputStateCreateInfo(vertexInputBindings,
-                                                      vertexInputAttributes);
-  pipelineCreateInfo.pVertexInputState = &vertexInputState;
-  shaderStages[0] = CreateShader(
-      device, pipelinesConfig["G-Buffer"]["VertexShader"].get<std::string>(),
-      VK_SHADER_STAGE_VERTEX_BIT);
-  shaderStages[1] = CreateShader(
-      device, pipelinesConfig["G-Buffer"]["FragmentShader"].get<std::string>(),
-      VK_SHADER_STAGE_FRAGMENT_BIT);
+    // レンダーパスは別にします。
+    pipelineCreateInfo.renderPass = frameBuffers.gBuffer.renderPass;
+    pipelineCreateInfo.layout = pipelineLayouts.gBuffer;
 
-  // レンダーパスは別にします。
-  pipelineCreateInfo.renderPass = frameBuffers.gBuffer.renderPass;
-  pipelineCreateInfo.layout = pipelineLayouts.gBuffer;
+    // カラーアタッチメントに何も描画しないようにします。
+    std::array<VkPipelineColorBlendAttachmentState, 3>
+        colorBlendAttachmentStates = {
+        Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE),
+        Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE),
+        Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE),
+    };
+    colorBlendState.attachmentCount =
+        static_cast<uint32_t>(colorBlendAttachmentStates.size());
+    colorBlendState.pAttachments = colorBlendAttachmentStates.data();
 
-  // カラーアタッチメントに何も描画しないようにします。
-  std::array<VkPipelineColorBlendAttachmentState, 3>
-      colorBlendAttachmentStates = {
-          Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE),
-          Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE),
-          Initializer::PipelineColorBlendAttachmentState(0xf, VK_FALSE),
-      };
-  colorBlendState.attachmentCount =
-      static_cast<uint32_t>(colorBlendAttachmentStates.size());
-  colorBlendState.pAttachments = colorBlendAttachmentStates.data();
-
-  VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
-                                            &pipelineCreateInfo, nullptr,
-                                            &pipelines.gBuffer));
-  vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
-  vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1,
+                                              &pipelineCreateInfo, nullptr,
+                                              &pipelines.gBuffer));
+    vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+    vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+  }
 }
 
 //*-----------------------------------------------------------------------------
@@ -444,14 +455,44 @@ void ProtoSSAO::PrepareUniformBuffers() {
   VK_CHECK_RESULT(uniformBuffers.gBuffer.Map(device));
 
   VK_CHECK_RESULT(
+      uniformBuffers.ssao.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     sizeof(uboSSAO), &uboSSAO));
+  VK_CHECK_RESULT(uniformBuffers.ssao.Map(device));
+
+  VK_CHECK_RESULT(
       uniformBuffers.lighting.Create(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                      sizeof(uboLighting), &uboLighting));
   VK_CHECK_RESULT(uniformBuffers.lighting.Map(device));
 
+  std::random_device rd;
+  std::mt19937 engine(rd());
+  UniformDistribution dist;
 
-  uboLighting.displayRenderTarget = 0;
+  // SSAO
+  {
+    uboSSAO.radius = 0.55f;
+    uboSSAO.bias = 0.25f;
+    for (size_t i = 0; i < KERNEL_SIZE; i++) {
+      glm::vec3 randDir = dist.OnHemisphere(engine);
+      const float scale = static_cast<float>(i * i) /
+                          static_cast<float>(KERNEL_SIZE * KERNEL_SIZE);
+      randDir *= glm::mix(0.1f, 1.0f, scale);
+
+      uboSSAO.kernel[i].x = randDir.x;
+      uboSSAO.kernel[i].y = randDir.y;
+      uboSSAO.kernel[i].z = randDir.z;
+      uboSSAO.kernel[i].w = 0.0f;
+    }
+  }
+  
+  // Lighting
+  {
+    uboLighting.displayRenderTarget = 0;
+  }
 
   UpdateUniformBuffers();
 }
@@ -664,11 +705,13 @@ void ProtoSSAO::UpdateUniformBuffers() {
                           static_cast<float>(swapchain.extent.width) /
                               static_cast<float>(swapchain.extent.height),
                           0.3f, 100.0f);
-  UpdateGBufferUniformBuffers();
-  UpdateLightingUniformBuffers();
+
+  UpdateGBufferUniformBuffer();
+  UpdateSSAOUniformBuffer();
+  UpdateLightingUniformBuffer();
 }
 
-void ProtoSSAO::UpdateGBufferUniformBuffers() {
+void ProtoSSAO::UpdateGBufferUniformBuffer() {
   // 行列をシェーダーに渡します。
   uboGBuffer.view = camera.GetViewMatrix();
   uboGBuffer.proj = camera.GetProjectionMatrix();
@@ -677,7 +720,13 @@ void ProtoSSAO::UpdateGBufferUniformBuffers() {
   uniformBuffers.gBuffer.Copy(&uboGBuffer, sizeof(uboGBuffer));
 }
 
-void ProtoSSAO::UpdateLightingUniformBuffers() {
+void ProtoSSAO::UpdateSSAOUniformBuffer() {
+  uboSSAO.proj = camera.GetProjectionMatrix();
+
+  uniformBuffers.ssao.Copy(&uboSSAO, sizeof(uboSSAO));
+}
+
+void ProtoSSAO::UpdateLightingUniformBuffer() {
   int i = 0;
   for (const auto &light : config["Lights"]) {
     for (int j = 0; j < 4; j++) {
@@ -701,6 +750,6 @@ void ProtoSSAO::OnUpdateUIOverlay() {
   if (uiOverlay.Combo("Display Render Target", &uboLighting.displayRenderTarget,
                       {"Final Result", "Only SSAO", "No SSAO", "Position",
                        "Normal", "Albedo"})) {
-    UpdateLightingUniformBuffers();
+    UpdateLightingUniformBuffer();
   }
 }

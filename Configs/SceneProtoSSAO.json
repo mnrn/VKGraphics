@@ -10,6 +10,10 @@
             "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/Experimental/GBuffer.vs.spv",
             "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Experimental/GBuffer.fs.spv"
         },
+        "SSAO": {
+            "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/Experimental/SSAO.vs.spv",
+            "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Experimental/SSAO.fs.spv"
+        },
         "Lighting": {
             "VertexShader": "./Assets/Shaders/GLSL/SPIR-V/Experimental/PostProcess.vs.spv",
             "FragmentShader": "./Assets/Shaders/GLSL/SPIR-V/Experimental/Lighting.fs.spv"
@@ -31,9 +35,7 @@
     },
     "Camera": {
         "Position": [2.1, 1.5, 2.1],
-        "Target": [0, 1, 0],
-        "Radius": 5,
-        "RotationSpeed": 0.2
+        "Target": [0, 1, 0]
     },
     "Lights": [
         {
