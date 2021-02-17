@@ -12,12 +12,12 @@
 #include <optional>
 #include <vector>
 
-#include <GLFW/glfw3.h>
-
 #include "VK/Debug.h"
 #include "VK/Device.h"
 #include "VK/Gui.h"
 #include "VK/Swapchain.h"
+
+struct GLFWwindow;
 
 class VkBase : private boost::noncopyable {
 public:
@@ -92,23 +92,20 @@ protected:
   std::vector<VkFramebuffer> framebuffers{};
   /** @brief 現在使用しているフレームバッファのインデックス */
   uint32_t currentBuffer = 0;
-  /** @brief  同期セマフォ */
+
   struct {
-    /** @brief swap chain image presentation */
     VkSemaphore presentComplete = VK_NULL_HANDLE;
-    /** @brief コマンドバッファの送信と実行に用います。 */
     VkSemaphore renderComplete = VK_NULL_HANDLE;
   } semaphores{};
   std::vector<VkFence> waitFences{};
-  /** @brief キューに提示されるコマンドバッファとセマフォが含まれます。*/
+
   VkSubmitInfo submitInfo{};
-  /** @brief
-   * グラフィックキューの送信を待機するために使用されるパイプラインステージ */
+
   VkPipelineStageFlags submitPipelineStages =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  /** @brief Pipeline cache object */
+
   VkPipelineCache pipelineCache = VK_NULL_HANDLE;
-  /** @brief Depth stencil object */
+
   struct {
     VkImage image = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;

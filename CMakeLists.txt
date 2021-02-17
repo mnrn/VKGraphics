@@ -21,14 +21,26 @@ message(STATUS "@@Vulkan_LIBRARY: ${Vulkan_LIBRARY}")
 include_directories(${Vulkan_INCLUDE_DIR})
 
 # glfw
-set(GLFW_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/glfw/libglfw.3.3.dylib)
+if (WIN32)
+    set(GLFW_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/glfw/glfw3.lib)
+elseif (APPLE)
+    set(GLFW_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/glfw/libglfw.3.3.dylib)
+endif()
 message("@@ GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
 
 # imgui
 include_directories(SYSTEM third-party/imgui)
 
 # assimp
-set(ASSIMP_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/assimp/libassimp.5.0.1.dylib)
+if (WIN32)
+    if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        set(ASSIMP_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/assimp/win/release/assimp-vc142-mt.lib)
+    else()
+        set(ASSIMP_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/assimp/win/release/assimp-vc142-mt.lib)
+    endif()
+elseif (APPLE)
+    set(ASSIMP_LIBRARIES ${CMAKE_SOURCE_DIR}/Lib/assimp/mac/libassimp.5.0.1.dylib)
+endif()
 message("@@ ASSIMP_LIBRARIES: ${ASSIMP_LIBRARIES}")
 
 # Warnings
@@ -83,7 +95,7 @@ endfunction(buildAll)
 
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Bin/")
 set(TARGETS
-    #MinimalVK
+    MinimalVK
     HelloTriangle
     TextureMapping
     PBR

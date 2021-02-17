@@ -17,7 +17,7 @@
 #include "VK/Utils.h"
 
 void Texture::Destroy(const Device &device) const {
-  if (sampler != nullptr) {
+  if (sampler != VK_NULL_HANDLE) {
     vkDestroySampler(device, sampler, nullptr);
   }
   vkDestroyImageView(device, view, nullptr);

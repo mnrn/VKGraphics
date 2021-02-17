@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include <string>
+
 #include "VK/Buffer.h"
 
 struct Device;

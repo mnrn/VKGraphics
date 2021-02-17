@@ -1,6 +1,7 @@
 *.DS_Store
 
 /.vs
+/.idea
 /out
 
 # Ignore the object files and dependency files.
