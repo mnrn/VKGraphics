@@ -4,6 +4,8 @@
 
 #pragma once
 
+#if !defined(NDEBUG)
+
 #include <vulkan/vulkan.h>
 
 struct DebugMessenger {
@@ -23,3 +25,5 @@ private:
                       VkDebugUtilsMessengerEXT debugMessenger,
                       const VkAllocationCallbacks *pAllocator);
 };
+
+#endif

@@ -2,6 +2,8 @@
  * @brief Debug for Vulkan
  */
 
+#if !defined(NDEBUG)
+
 #include "VK/Debug.h"
 
 #include <boost/assert.hpp>
@@ -100,3 +102,5 @@ VkDebugUtilsMessengerCreateInfoEXT DebugMessenger::ExtractCreateInfo() {
   createInfo.pfnUserCallback = Debug::Callback;
   return createInfo;
 }
+
+#endif

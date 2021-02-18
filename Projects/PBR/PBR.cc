@@ -205,16 +205,12 @@ void PBR::LoadAssets() {
   // Spot
   {
     const auto &modelPath = config["Spot"]["Model"].get<std::string>();
-    const auto result =
-        models.spot.LoadFromFile(device, modelPath, queue, vertexLayout);
-    BOOST_ASSERT_MSG(result, "Failed to load model!");
+    models.spot.LoadFromFile(device, modelPath, queue, vertexLayout);
   }
   // Floor
   {
     const auto &modelPath = config["Floor"]["Model"].get<std::string>();
-    const auto result =
-        models.floor.LoadFromFile(device, modelPath, queue, vertexLayout);
-    BOOST_ASSERT_MSG(result, "Failed to load model!");
+    models.floor.LoadFromFile(device, modelPath, queue, vertexLayout);
   }
 }
 
