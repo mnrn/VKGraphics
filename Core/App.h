@@ -53,6 +53,7 @@ public:
     glfwSetWindowUserPointer(window_, app.get());
     glfwSetFramebufferSizeCallback(window_, VkBase::OnResized);
     app->OnInit(config_, window_);
+    app->OnPostInit();
 
     while (!glfwWindowShouldClose(window_) &&
            !glfwGetKey(window_, GLFW_KEY_ESCAPE)) {
@@ -65,6 +66,7 @@ public:
     }
     app->WaitIdle();
 
+    app->OnPreDestroy();
     app->OnDestroy();
     return EXIT_SUCCESS;
   }

@@ -43,8 +43,6 @@ void VkBase::OnInit(const nlohmann::json &conf, GLFWwindow *hwnd) {
   // デバイスからグラフィックスキューを取得します。
   vkGetDeviceQueue(device, device.queueFamilyIndices.graphics, 0, &queue);
   CreateSemaphores();
-
-  OnPostInit();
 }
 
 void VkBase::OnPostInit() {
@@ -69,8 +67,6 @@ void VkBase::OnPostInit() {
 void VkBase::OnPreDestroy() {}
 
 void VkBase::OnDestroy() {
-  OnPreDestroy();
-
   if (IsEnabledUIOverlay()) {
     uiOverlay.OnDestroy(device);
   }
